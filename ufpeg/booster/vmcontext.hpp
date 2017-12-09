@@ -10,17 +10,16 @@ namespace ufpeg {
     template<typename T>
     using fast_stack = std::stack<T, std::vector<T>>;
 
-    class Context {
-    public:
-        Context(const std::u32string &text):
+    struct VmContext {
+        VmContext(const std::u32string &text):
             text(text) {
-                this->pointers.push(0);
-                this->cursors.push(0);
-                this->nodes.push({ nullptr });
-                this->offset = 0;
-                this->has_matched = true;
-            }
-    public:
+            this->pointers.push(0);
+            this->cursors.push(0);
+            this->nodes.push({ nullptr });
+            this->offset = 0;
+            this->has_matched = true;
+        }
+
         const std::u32string text;
         fast_stack<std::size_t> pointers, cursors;
         fast_stack<Node> nodes;

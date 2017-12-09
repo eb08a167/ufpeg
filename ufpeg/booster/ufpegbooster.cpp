@@ -5,7 +5,7 @@
 
 #include "vm.hpp"
 
-std::u32string to_string(PyObject *pytext) {
+std::u32string to_u32string(PyObject *pytext) {
     if (!PyUnicode_Check(pytext)) {
         PyErr_Format(PyExc_TypeError, "%R is not a string", pytext);
         return {};
@@ -61,7 +61,7 @@ ufpeg::ConsumeInstruction *to_consume_instruction(PyObject *pyinstruction) {
         return nullptr;
     }
 
-    auto name = to_string(pyname.get());
+    auto name = to_u32string(pyname.get());
     if (PyErr_Occurred()) {
         return nullptr;
     } else {
@@ -94,7 +94,7 @@ ufpeg::MatchLiteralInstruction *to_match_literal_instruction(PyObject *pyinstruc
         return nullptr;
     }
 
-    auto literal = to_string(pyliteral.get());
+    auto literal = to_u32string(pyliteral.get());
     if (PyErr_Occurred()) {
         return nullptr;
     } else {
@@ -158,7 +158,7 @@ ufpeg::ExpectInstruction *to_expect_instruction(PyObject *pyinstruction) {
         return nullptr;
     }
 
-    auto name = to_string(pyname.get());
+    auto name = to_u32string(pyname.get());
     if (PyErr_Occurred()) {
         return nullptr;
     } else {
@@ -190,7 +190,7 @@ PyObject *run(PyObject *self, PyObject *args) {
         return nullptr;
     }
 
-    std::u32string text = to_string(pytext);
+    std::u32string text = to_u32string(pytext);
     if (PyErr_Occurred()) {
         return nullptr;
     }
@@ -254,7 +254,7 @@ PyObject *run(PyObject *self, PyObject *args) {
         }
     }
 
-    ufpeg::VM vm(instructions);
+    ufpeg::Vm vm(instructions);
 
     vm.run(text);
 
@@ -264,7 +264,7 @@ PyObject *run(PyObject *self, PyObject *args) {
 PyMODINIT_FUNC PyInit_booster() {
     static PyMethodDef methods[] = {
         { "run", run, METH_VARARGS, nullptr },
-        { nullptr, nullptr, 0, nullptr },
+        { nullptr },
     };
 
     static PyModuleDef moduledef = {

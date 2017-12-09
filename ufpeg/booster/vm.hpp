@@ -6,13 +6,13 @@
 #include "instructions.hpp"
 
 namespace ufpeg {
-    class VM {
+    class Vm {
     public:
-        VM(const std::vector<std::shared_ptr<BaseInstruction>> &instructions):
+        Vm(const std::vector<std::shared_ptr<BaseInstruction>> &instructions):
             instructions(instructions) {}
 
         void run(const std::u32string &text) const {
-            Context context(text);
+            VmContext context(text);
 
             while (!context.pointers.empty()) {
                 auto pointer = context.pointers.top();

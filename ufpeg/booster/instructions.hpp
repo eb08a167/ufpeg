@@ -1,12 +1,12 @@
 #ifndef UFPEG_INSTRUCTIONS_HPP
 #define UFPEG_INSTRUCTIONS_HPP
 
-#include "context.hpp"
+#include "vmcontext.hpp"
 
 namespace ufpeg {
     class BaseInstruction {
     public:
-        virtual void update(Context&) const = 0;
+        virtual void update(VmContext&) const = 0;
 
         virtual ~BaseInstruction() = default;
     };
@@ -16,7 +16,7 @@ namespace ufpeg {
         InvokeInstruction(std::size_t pointer):
             pointer(pointer) {}
 
-        void update(Context &context) const {
+        void update(VmContext &context) const {
             context.pointers.top()++;
 
             context.pointers.push(this->pointer);
@@ -27,14 +27,14 @@ namespace ufpeg {
 
     class RevokeInstruction: public BaseInstruction {
     public:
-        void update(Context &context) const {
+        void update(VmContext &context) const {
             context.pointers.pop();
         }
     };
 
     class PrepareInstruction: public BaseInstruction {
     public:
-        void update(Context &context) const {
+        void update(VmContext &context) const {
             context.nodes.push({ nullptr, context.cursors.top() });
 
             context.pointers.top()++;
@@ -46,7 +46,7 @@ namespace ufpeg {
         ConsumeInstruction(const std::u32string &name):
             name(name) {}
 
-        void update(Context &context) const {
+        void update(VmContext &context) const {
             auto child = std::move(context.nodes.top());
             context.nodes.pop();
             child.name = this->name.c_str();
@@ -62,7 +62,7 @@ namespace ufpeg {
 
     class DiscardInstruction: public BaseInstruction {
     public:
-        void update(Context &context) const {
+        void update(VmContext &context) const {
             context.nodes.pop();
 
             context.pointers.top()++;
@@ -71,7 +71,7 @@ namespace ufpeg {
 
     class BeginInstruction: public BaseInstruction {
     public:
-        void update(Context &context) const {
+        void update(VmContext &context) const {
             auto cursor = context.cursors.top();
             context.cursors.push(cursor);
 
@@ -81,7 +81,7 @@ namespace ufpeg {
 
     class CommitInstruction: public BaseInstruction {
     public:
-        void update(Context &context) const {
+        void update(VmContext &context) const {
             auto cursor = context.cursors.top();
             context.cursors.pop();
             context.cursors.top() = cursor;
@@ -92,7 +92,7 @@ namespace ufpeg {
 
     class AbortInstruction: public BaseInstruction {
     public:
-        void update(Context &context) const {
+        void update(VmContext &context) const {
             context.cursors.pop();
 
             context.pointers.top()++;
@@ -104,7 +104,7 @@ namespace ufpeg {
         MatchLiteralInstruction(const std::u32string &literal):
             literal(literal) {}
 
-        void update(Context &context) const {
+        void update(VmContext &context) const {
             auto &cursor = context.cursors.top();
             const auto length = this->literal.length();
 
@@ -127,7 +127,7 @@ namespace ufpeg {
         BranchInstruction(std::size_t success, std::size_t failure):
             success(success), failure(failure) {}
 
-        void update(Context &context) const {
+        void update(VmContext &context) const {
             auto &pointer = context.pointers.top();
             pointer = context.has_matched ? this->success : this->failure;
         }
@@ -140,7 +140,7 @@ namespace ufpeg {
         JumpInstruction(std::size_t pointer):
             pointer(pointer) {}
 
-        void update(Context &context) const {
+        void update(VmContext &context) const {
             context.pointers.top() = this->pointer;
         }
     private:
@@ -149,14 +149,14 @@ namespace ufpeg {
 
     class PassInstruction: public BaseInstruction {
     public:
-        void update(Context &context) const {
+        void update(VmContext &context) const {
             context.pointers.top()++;
         }
     };
 
     class FlipInstruction: public BaseInstruction {
     public:
-        void update(Context &context) const {
+        void update(VmContext &context) const {
             context.has_matched = !context.has_matched;
 
             context.pointers.top()++;
@@ -168,7 +168,7 @@ namespace ufpeg {
         ExpectInstruction(const std::u32string &name):
             name(name) {}
 
-        void update(Context &context) const {
+        void update(VmContext &context) const {
             auto cursor = context.cursors.top();
             if (cursor > context.offset) {
                 context.expectations.clear();
