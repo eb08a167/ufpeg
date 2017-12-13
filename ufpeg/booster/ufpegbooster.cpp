@@ -3,7 +3,7 @@
 #include <functional>
 #include <map>
 
-#include "vm.hpp"
+#include "executor.hpp"
 
 std::u32string to_u32string(PyObject *pytext) {
     if (!PyUnicode_Check(pytext)) {
@@ -166,7 +166,7 @@ ufpeg::ExpectInstruction *to_expect_instruction(PyObject *pyinstruction) {
     }
 }
 
-const std::map<std::string, std::function<ufpeg::BaseInstruction*(PyObject*)>> converters {
+const std::map<std::string, std::function<ufpeg::BaseSimpleInstruction*(PyObject*)>> converters {
     { "ufpeg.instructions.InvokeInstruction", to_invoke_instruction },
     { "ufpeg.instructions.RevokeInstruction", to_revoke_instruction },
     { "ufpeg.instructions.PrepareInstruction", to_prepare_instruction },
@@ -195,7 +195,7 @@ PyObject *run(PyObject *self, PyObject *args) {
         return nullptr;
     }
 
-    std::vector<std::shared_ptr<ufpeg::BaseInstruction>> instructions;
+    std::vector<std::shared_ptr<ufpeg::BaseSimpleInstruction>> instructions;
 
     std::shared_ptr<PyObject> iter(PyObject_GetIter(pyinstructions), Py_DecRef);
     if (PyErr_Occurred()) {
@@ -254,9 +254,9 @@ PyObject *run(PyObject *self, PyObject *args) {
         }
     }
 
-    ufpeg::Vm vm(instructions);
+    ufpeg::Executor executor(instructions);
 
-    vm.run(text);
+    executor.execute(text);
 
     Py_RETURN_NONE;
 }
