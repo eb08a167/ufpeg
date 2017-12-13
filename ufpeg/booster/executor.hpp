@@ -8,7 +8,7 @@
 namespace ufpeg {
     class Executor {
     public:
-        Executor(const std::vector<std::shared_ptr<BaseSimpleInstruction>> &instructions):
+        Executor(const std::vector<std::shared_ptr<SimpleInstruction>> &instructions):
             instructions(instructions) {}
 
         void execute(const std::u32string &text) const {
@@ -27,7 +27,7 @@ namespace ufpeg {
             }
         }
     private:
-        const std::vector<std::shared_ptr<BaseSimpleInstruction>> instructions;
+        const std::vector<std::shared_ptr<SimpleInstruction>> instructions;
     };
 }
 

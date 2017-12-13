@@ -36,11 +36,11 @@ ufpeg::InvokeInstruction *to_invoke_instruction(PyObject *pyinstruction) {
         return nullptr;
     }
 
-    auto pointer = PyLong_AsSize_t(pypointer.get());
+    //auto pointer = PyLong_AsSize_t(pypointer.get());
     if (PyErr_Occurred()) {
         return nullptr;
     } else {
-        return new ufpeg::InvokeInstruction(pointer);
+        return new ufpeg::InvokeInstruction({});
     }
 }
 
@@ -166,7 +166,7 @@ ufpeg::ExpectInstruction *to_expect_instruction(PyObject *pyinstruction) {
     }
 }
 
-const std::map<std::string, std::function<ufpeg::BaseSimpleInstruction*(PyObject*)>> converters {
+const std::map<std::string, std::function<ufpeg::SimpleInstruction*(PyObject*)>> converters {
     { "ufpeg.instructions.InvokeInstruction", to_invoke_instruction },
     { "ufpeg.instructions.RevokeInstruction", to_revoke_instruction },
     { "ufpeg.instructions.PrepareInstruction", to_prepare_instruction },
@@ -195,7 +195,7 @@ PyObject *run(PyObject *self, PyObject *args) {
         return nullptr;
     }
 
-    std::vector<std::shared_ptr<ufpeg::BaseSimpleInstruction>> instructions;
+    std::vector<std::shared_ptr<ufpeg::SimpleInstruction>> instructions;
 
     std::shared_ptr<PyObject> iter(PyObject_GetIter(pyinstructions), Py_DecRef);
     if (PyErr_Occurred()) {
