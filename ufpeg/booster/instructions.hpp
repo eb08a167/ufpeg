@@ -6,7 +6,7 @@
 #include "executorcontext.hpp"
 
 namespace ufpeg {
-    class SimpleInstruction;
+    class AtomicInstruction;
 
     class Instruction {
     public:
@@ -14,12 +14,12 @@ namespace ufpeg {
 
         virtual std::shared_ptr<Instruction> translate(std::size_t) const = 0;
 
-        virtual std::vector<std::shared_ptr<SimpleInstruction>> flatten() const = 0;
+        virtual std::vector<std::shared_ptr<AtomicInstruction>> flatten() const = 0;
     };
 
-    class SimpleInstruction: public Instruction {
+    class AtomicInstruction: public Instruction {
     public:
-        SimpleInstruction(const std::u32string &label = {}):
+        AtomicInstruction(const std::u32string &label = {}):
             label(label) {}
 
         virtual void execute(ExecutorContext&) const = 0;
@@ -31,16 +31,16 @@ namespace ufpeg {
         const std::u32string label;
     };
 
-    class InvokeInstruction: public SimpleInstruction {
+    class InvokeInstruction: public AtomicInstruction {
     public:
         InvokeInstruction(const std::u32string &target, const std::u32string &label = {}):
-            SimpleInstruction(label), target(target) {}
+            AtomicInstruction(label), target(target) {}
 
         std::shared_ptr<Instruction> translate(std::size_t) const {
             return std::make_shared<InvokeInstruction>(*this);
         }
 
-        std::vector<std::shared_ptr<SimpleInstruction>> flatten() const {
+        std::vector<std::shared_ptr<AtomicInstruction>> flatten() const {
             return { std::make_shared<InvokeInstruction>(*this) };
         }
 
@@ -53,13 +53,13 @@ namespace ufpeg {
         const std::u32string target;
     };
 
-    class RevokeInstruction: public SimpleInstruction {
+    class RevokeInstruction: public AtomicInstruction {
     public:
         std::shared_ptr<Instruction> translate(std::size_t) const {
             return std::make_shared<RevokeInstruction>(*this);
         }
 
-        std::vector<std::shared_ptr<SimpleInstruction>> flatten() const {
+        std::vector<std::shared_ptr<AtomicInstruction>> flatten() const {
             return { std::make_shared<RevokeInstruction>(*this) };
         }
 
@@ -68,13 +68,13 @@ namespace ufpeg {
         }
     };
 
-    class PrepareInstruction: public SimpleInstruction {
+    class PrepareInstruction: public AtomicInstruction {
     public:
         std::shared_ptr<Instruction> translate(std::size_t) const {
             return std::make_shared<PrepareInstruction>(*this);
         }
 
-        std::vector<std::shared_ptr<SimpleInstruction>> flatten() const {
+        std::vector<std::shared_ptr<AtomicInstruction>> flatten() const {
             return { std::make_shared<PrepareInstruction>(*this) };
         }
 
@@ -85,16 +85,16 @@ namespace ufpeg {
         }
     };
 
-    class ConsumeInstruction: public SimpleInstruction {
+    class ConsumeInstruction: public AtomicInstruction {
     public:
         ConsumeInstruction(const std::u32string &name, const std::u32string &label = {}):
-            SimpleInstruction(label), name(name) {}
+            AtomicInstruction(label), name(name) {}
 
         std::shared_ptr<Instruction> translate(std::size_t) const {
             return std::make_shared<ConsumeInstruction>(*this);
         }
 
-        std::vector<std::shared_ptr<SimpleInstruction>> flatten() const {
+        std::vector<std::shared_ptr<AtomicInstruction>> flatten() const {
             return { std::make_shared<ConsumeInstruction>(*this) };
         }
 
@@ -112,13 +112,13 @@ namespace ufpeg {
         const std::u32string name;
     };
 
-    class DiscardInstruction: public SimpleInstruction {
+    class DiscardInstruction: public AtomicInstruction {
     public:
         std::shared_ptr<Instruction> translate(std::size_t) const {
             return std::make_shared<DiscardInstruction>(*this);
         }
 
-        std::vector<std::shared_ptr<SimpleInstruction>> flatten() const {
+        std::vector<std::shared_ptr<AtomicInstruction>> flatten() const {
             return { std::make_shared<DiscardInstruction>(*this) };
         }
 
@@ -129,13 +129,13 @@ namespace ufpeg {
         }
     };
 
-    class BeginInstruction: public SimpleInstruction {
+    class BeginInstruction: public AtomicInstruction {
     public:
         std::shared_ptr<Instruction> translate(std::size_t) const {
             return std::make_shared<BeginInstruction>(*this);
         }
 
-        std::vector<std::shared_ptr<SimpleInstruction>> flatten() const {
+        std::vector<std::shared_ptr<AtomicInstruction>> flatten() const {
             return { std::make_shared<BeginInstruction>(*this) };
         }
 
@@ -147,13 +147,13 @@ namespace ufpeg {
         }
     };
 
-    class CommitInstruction: public SimpleInstruction {
+    class CommitInstruction: public AtomicInstruction {
     public:
         std::shared_ptr<Instruction> translate(std::size_t) const {
             return std::make_shared<CommitInstruction>(*this);
         }
 
-        std::vector<std::shared_ptr<SimpleInstruction>> flatten() const {
+        std::vector<std::shared_ptr<AtomicInstruction>> flatten() const {
             return { std::make_shared<CommitInstruction>(*this) };
         }
 
@@ -166,13 +166,13 @@ namespace ufpeg {
         }
     };
 
-    class AbortInstruction: public SimpleInstruction {
+    class AbortInstruction: public AtomicInstruction {
     public:
         std::shared_ptr<Instruction> translate(std::size_t) const {
             return std::make_shared<AbortInstruction>(*this);
         }
 
-        std::vector<std::shared_ptr<SimpleInstruction>> flatten() const {
+        std::vector<std::shared_ptr<AtomicInstruction>> flatten() const {
             return { std::make_shared<AbortInstruction>(*this) };
         }
 
@@ -183,16 +183,16 @@ namespace ufpeg {
         }
     };
 
-    class MatchLiteralInstruction: public SimpleInstruction {
+    class MatchLiteralInstruction: public AtomicInstruction {
     public:
         MatchLiteralInstruction(const std::u32string &literal, const std::u32string &label = {}):
-            SimpleInstruction(label), literal(literal) {}
+            AtomicInstruction(label), literal(literal) {}
 
         std::shared_ptr<Instruction> translate(std::size_t) const {
             return std::make_shared<MatchLiteralInstruction>(*this);
         }
 
-        std::vector<std::shared_ptr<SimpleInstruction>> flatten() const {
+        std::vector<std::shared_ptr<AtomicInstruction>> flatten() const {
             return { std::make_shared<MatchLiteralInstruction>(*this) };
         }
 
@@ -214,14 +214,14 @@ namespace ufpeg {
         const std::u32string literal;
     };
 
-    class BranchInstruction: public SimpleInstruction {
+    class BranchInstruction: public AtomicInstruction {
     public:
         BranchInstruction(
             std::size_t success,
             std::size_t failure,
             const std::u32string &label = {}
         ):
-            SimpleInstruction(label), success(success), failure(failure) {}
+            AtomicInstruction(label), success(success), failure(failure) {}
 
         std::shared_ptr<Instruction> translate(std::size_t offset) const {
             return std::make_shared<BranchInstruction>(
@@ -231,7 +231,7 @@ namespace ufpeg {
             );
         }
 
-        std::vector<std::shared_ptr<SimpleInstruction>> flatten() const {
+        std::vector<std::shared_ptr<AtomicInstruction>> flatten() const {
             return { std::make_shared<BranchInstruction>(*this) };
         }
 
@@ -243,10 +243,10 @@ namespace ufpeg {
         const std::size_t success, failure;
     };
 
-    class JumpInstruction: public SimpleInstruction {
+    class JumpInstruction: public AtomicInstruction {
     public:
         JumpInstruction(std::size_t pointer, const std::u32string &label = {}):
-            SimpleInstruction(label), pointer(pointer) {}
+            AtomicInstruction(label), pointer(pointer) {}
 
         std::shared_ptr<Instruction> translate(std::size_t offset) const {
             return std::make_shared<JumpInstruction>(
@@ -255,7 +255,7 @@ namespace ufpeg {
             );
         }
 
-        std::vector<std::shared_ptr<SimpleInstruction>> flatten() const {
+        std::vector<std::shared_ptr<AtomicInstruction>> flatten() const {
             return { std::make_shared<JumpInstruction>(*this) };
         }
 
@@ -266,13 +266,13 @@ namespace ufpeg {
         const std::size_t pointer;
     };
 
-    class PassInstruction: public SimpleInstruction {
+    class PassInstruction: public AtomicInstruction {
     public:
         std::shared_ptr<Instruction> translate(std::size_t) const {
             return std::make_shared<PassInstruction>(*this);
         }
 
-        std::vector<std::shared_ptr<SimpleInstruction>> flatten() const {
+        std::vector<std::shared_ptr<AtomicInstruction>> flatten() const {
             return { std::make_shared<PassInstruction>(*this) };
         }
 
@@ -281,13 +281,13 @@ namespace ufpeg {
         }
     };
 
-    class FlipInstruction: public SimpleInstruction {
+    class FlipInstruction: public AtomicInstruction {
     public:
         std::shared_ptr<Instruction> translate(std::size_t) const {
             return std::make_shared<FlipInstruction>(*this);
         }
 
-        std::vector<std::shared_ptr<SimpleInstruction>> flatten() const {
+        std::vector<std::shared_ptr<AtomicInstruction>> flatten() const {
             return { std::make_shared<FlipInstruction>(*this) };
         }
 
@@ -298,16 +298,16 @@ namespace ufpeg {
         }
     };
 
-    class ExpectInstruction: public SimpleInstruction {
+    class ExpectInstruction: public AtomicInstruction {
     public:
         ExpectInstruction(const std::u32string &name, const std::u32string &label = {}):
-            SimpleInstruction(label), name(name) {}
+            AtomicInstruction(label), name(name) {}
 
         std::shared_ptr<Instruction> translate(std::size_t) const {
             return std::make_shared<ExpectInstruction>(*this);
         }
 
-        std::vector<std::shared_ptr<SimpleInstruction>> flatten() const {
+        std::vector<std::shared_ptr<AtomicInstruction>> flatten() const {
             return { std::make_shared<ExpectInstruction>(*this) };
         }
 
@@ -343,8 +343,8 @@ namespace ufpeg {
             return std::make_shared<CompoundInstruction>(instructions);
         }
 
-        std::vector<std::shared_ptr<SimpleInstruction>> flatten() const {
-            std::vector<std::shared_ptr<SimpleInstruction>> result;
+        std::vector<std::shared_ptr<AtomicInstruction>> flatten() const {
+            std::vector<std::shared_ptr<AtomicInstruction>> result;
             std::size_t offset = 0;
 
             for (auto instruction: this->instructions) {
