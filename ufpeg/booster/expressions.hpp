@@ -13,20 +13,20 @@ namespace ufpeg {
 
     class SequenceExpression: public Expression {
     public:
-        SequenceExpression(const std::vector<std::shared_ptr<Expression>> &expressions):
-            expressions(expressions) {}
+        SequenceExpression(const std::vector<std::shared_ptr<Expression>> &items):
+            items(items) {}
 
         std::shared_ptr<Instruction> compile() const {
-            auto size = this->expressions.size();
+            auto size = this->items.size();
             std::vector<std::shared_ptr<Instruction>> instructions;
 
             instructions.emplace_back(std::make_shared<BeginInstruction>());
 
             for (std::size_t i = 0; i < size; i++) {
-                auto instruction = this->expressions[i]->compile();
-                auto branch = std::make_shared<BranchInstruction>(2 * i + 1, 2 * size + 3);
+                auto base = this->items[i]->compile();
+                auto branch = std::make_shared<BranchInstruction>(2 * i + 3, 2 * size + 3);
 
-                instructions.emplace_back(instruction);
+                instructions.emplace_back(base);
                 instructions.emplace_back(branch);
             }
 
@@ -40,7 +40,36 @@ namespace ufpeg {
             return std::make_shared<CompoundInstruction>(instructions);
         }
     private:
-        const std::vector<std::shared_ptr<Expression>> expressions;
+        const std::vector<std::shared_ptr<Expression>> items;
+    };
+
+    class ChoiceExpression: public Expression {
+    public:
+        ChoiceExpression(const std::vector<std::shared_ptr<Expression>> &choices):
+            choices(choices) {}
+
+        std::shared_ptr<Instruction> compile() const {
+            auto size = this->choices.size();
+            std::vector<std::shared_ptr<Instruction>> instructions;
+
+            for (auto it = this->choices.begin(); it != this->choices.end(); it++) {
+                auto i = std::distance(this->choices.begin(), it);
+
+                auto base = this->choices[i]->compile();
+                instructions.emplace_back(base);
+
+                if (it != this->choices.end()) {
+                    auto branch = std::make_shared<BranchInstruction>(2 * size + 1, 2 * i + 2);
+                    instructions.emplace_back(branch);
+                }
+            }
+
+            instructions.emplace_back(std::make_shared<PassInstruction>());
+
+            return std::make_shared<CompoundInstruction>(instructions);
+        }
+    private:
+        const std::vector<std::shared_ptr<Expression>> choices;
     };
 }
 
