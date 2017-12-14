@@ -78,6 +78,23 @@ namespace ufpeg {
     private:
         const std::u32string literal;
     };
+
+    class RepeatExpression: public Expression {
+    public:
+        RepeatExpression(const std::shared_ptr<Expression> &item):
+            item(item) {}
+
+        std::shared_ptr<Instruction> compile() const {
+            std::vector<std::shared_ptr<Instruction>> instructions = {
+                this->item->compile(),
+                std::make_shared<BranchInstruction>(0, 2),
+            };
+
+            return std::make_shared<CompoundInstruction>(instructions);
+        }
+    private:
+        const std::shared_ptr<Expression> item;
+    };
 }
 
 #endif
