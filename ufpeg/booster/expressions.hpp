@@ -22,7 +22,7 @@ namespace ufpeg {
 
             instructions.emplace_back(std::make_shared<BeginInstruction>());
 
-            for (auto it = this->items.begin(); it != this->items.end(); it++) {
+            for (auto it = this->items.begin(); it != this->items.end(); ++it) {
                 auto base = (*it)->compile();
                 instructions.emplace_back(base);
 
@@ -52,7 +52,7 @@ namespace ufpeg {
             auto size = this->choices.size();
             std::vector<std::shared_ptr<Instruction>> instructions;
 
-            for (auto it = this->choices.begin(); it != this->choices.end(); it++) {
+            for (auto it = this->choices.begin(); it != this->choices.end(); ++it) {
                 auto base = (*it)->compile();
                 instructions.emplace_back(base);
 
