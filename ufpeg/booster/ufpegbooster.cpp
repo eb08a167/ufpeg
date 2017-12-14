@@ -4,6 +4,7 @@
 #include <map>
 
 #include "executor.hpp"
+#include "compiler.hpp"
 
 std::u32string to_u32string(PyObject *pytext) {
     if (!PyUnicode_Check(pytext)) {

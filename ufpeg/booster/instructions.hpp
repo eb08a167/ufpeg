@@ -1,6 +1,8 @@
 #ifndef UFPEG_INSTRUCTIONS_HPP
 #define UFPEG_INSTRUCTIONS_HPP
 
+#include <memory>
+
 #include "executorcontext.hpp"
 
 namespace ufpeg {
