@@ -1,6 +1,8 @@
 #ifndef UFPEG_EXPRESSIONS_HPP
 #define UFPEG_EXPRESSIONS_HPP
 
+#include <algorithm>
+
 #include "instructions.hpp"
 
 namespace ufpeg {
@@ -8,7 +10,7 @@ namespace ufpeg {
     public:
         virtual ~Expression() = default;
 
-        virtual std::shared_ptr<Instruction> compile() const = 0;
+        virtual std::vector<std::shared_ptr<Instruction>> compile() const = 0;
     };
 
     class SequenceExpression: public Expression {
@@ -16,28 +18,38 @@ namespace ufpeg {
         SequenceExpression(const std::vector<std::shared_ptr<Expression>> &items):
             items(items) {}
 
-        std::shared_ptr<Instruction> compile() const {
-            auto size = this->items.size();
-            std::vector<std::shared_ptr<Instruction>> instructions;
+        std::vector<std::shared_ptr<Instruction>> compile() const {
+            auto pass = std::make_shared<PassInstruction>();
+            auto abort = std::make_shared<AbortInstruction>();
+            auto jump = std::make_shared<JumpInstruction>(pass->get_reference());
+            auto commit = std::make_shared<CommitInstruction>();
+
+            std::vector<std::shared_ptr<Instruction>> instructions = { pass, abort, jump, commit };
+
+            std::shared_ptr<Instruction> success = commit, failure = abort;
+
+            for (auto it = this->items.rbegin(); it != this->items.rend(); ++it) {
+                auto branch = std::make_shared<BranchInstruction>(
+                    success->get_reference(),
+                    failure->get_reference()
+                );
+                instructions.emplace_back(branch);
+
+                auto item_instructions = (*it)->compile();
+                instructions.insert(
+                    instructions.end(),
+                    item_instructions.rbegin(),
+                    item_instructions.rend()
+                );
+
+                success = instructions.back();
+            }
 
             instructions.emplace_back(std::make_shared<BeginInstruction>());
 
-            for (auto it = this->items.begin(); it != this->items.end(); ++it) {
-                auto base = (*it)->compile();
-                instructions.emplace_back(base);
+            std::reverse(instructions.begin(), instructions.end());
 
-                auto i = std::distance(this->items.begin(), it);
-                auto branch = std::make_shared<BranchInstruction>(2 * i + 3, 2 * size + 3);
-                instructions.emplace_back(branch);
-            }
-
-            instructions.insert(instructions.end(), {
-                std::make_shared<CommitInstruction>(),
-                std::make_shared<JumpInstruction>(2 * size + 4),
-                std::make_shared<AbortInstruction>(),
-            });
-
-            return std::make_shared<CompoundInstruction>(instructions);
+            return instructions;
         }
     private:
         const std::vector<std::shared_ptr<Expression>> items;
@@ -48,20 +60,35 @@ namespace ufpeg {
         ChoiceExpression(const std::vector<std::shared_ptr<Expression>> &choices):
             choices(choices) {}
 
-        std::shared_ptr<Instruction> compile() const {
-            auto size = this->choices.size();
-            std::vector<std::shared_ptr<Instruction>> instructions;
+        std::vector<std::shared_ptr<Instruction>> compile() const {
+            auto pass = std::make_shared<PassInstruction>();
 
-            for (auto it = this->choices.begin(); it != this->choices.end(); ++it) {
-                auto base = (*it)->compile();
-                instructions.emplace_back(base);
+            std::vector<std::shared_ptr<Instruction>> instructions = { pass };
 
-                auto i = std::distance(this->choices.begin(), it);
-                auto branch = std::make_shared<BranchInstruction>(2 * size, 2 * i + 2);
-                instructions.emplace_back(branch);
+            std::shared_ptr<Instruction> success = pass, failure = pass;
+
+            for (auto it = this->choices.rbegin(); it != this->choices.rend(); ++it) {
+                if (success != failure) {
+                    auto branch = std::make_shared<BranchInstruction>(
+                        success->get_reference(),
+                        failure->get_reference()
+                    );
+                    instructions.emplace_back(branch);
+                }
+
+                auto choice_instructions = (*it)->compile();
+                instructions.insert(
+                    instructions.end(),
+                    choice_instructions.rbegin(),
+                    choice_instructions.rend()
+                );
+
+                failure = instructions.back();
             }
 
-            return std::make_shared<CompoundInstruction>(instructions);
+            std::reverse(instructions.begin(), instructions.end());
+
+            return instructions;
         }
     private:
         const std::vector<std::shared_ptr<Expression>> choices;
@@ -72,8 +99,8 @@ namespace ufpeg {
         LiteralExpression(const std::u32string &literal):
             literal(literal) {}
 
-        std::shared_ptr<Instruction> compile() const {
-            return std::make_shared<MatchLiteralInstruction>(this->literal);
+        std::vector<std::shared_ptr<Instruction>> compile() const {
+            return { std::make_shared<MatchLiteralInstruction>(this->literal) };
         }
     private:
         const std::u32string literal;
@@ -84,13 +111,20 @@ namespace ufpeg {
         RepeatExpression(const std::shared_ptr<Expression> &item):
             item(item) {}
 
-        std::shared_ptr<Instruction> compile() const {
-            std::vector<std::shared_ptr<Instruction>> instructions = {
-                this->item->compile(),
-                std::make_shared<BranchInstruction>(0, 2),
-            };
+        std::vector<std::shared_ptr<Instruction>> compile() const {
+            auto pass = std::make_shared<PassInstruction>();
+            auto instructions = this->item->compile();
+            auto &success = pass;
+            auto &failure = instructions.front();
+            auto branch = std::make_shared<BranchInstruction>(
+                success->get_reference(),
+                failure->get_reference()
+            );
 
-            return std::make_shared<CompoundInstruction>(instructions);
+            instructions.emplace_back(branch);
+            instructions.emplace_back(pass);
+
+            return instructions;
         }
     private:
         const std::shared_ptr<Expression> item;

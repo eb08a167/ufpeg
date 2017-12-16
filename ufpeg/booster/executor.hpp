@@ -6,7 +6,7 @@
 namespace ufpeg {
     class Executor {
     public:
-        Executor(const std::vector<std::shared_ptr<AtomicInstruction>> &instructions):
+        Executor(const std::vector<std::shared_ptr<Instruction>> &instructions):
             instructions(instructions) {}
 
         void execute(const std::u32string &text) const {
@@ -25,7 +25,7 @@ namespace ufpeg {
             }
         }
     private:
-        const std::vector<std::shared_ptr<AtomicInstruction>> instructions;
+        const std::vector<std::shared_ptr<Instruction>> instructions;
     };
 }
 

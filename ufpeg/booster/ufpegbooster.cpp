@@ -43,9 +43,9 @@ PyObject *run(PyObject *self, PyObject *args) {
         std::make_shared<ufpeg::LiteralExpression>(U"foo"),
         std::make_shared<ufpeg::LiteralExpression>(U"bar"),
     };
-    auto choice = std::make_shared<ufpeg::SequenceExpression>(choices);
-    auto instruction = choice->compile();
-    auto instructions = instruction->flatten();
+    auto choice = std::make_shared<ufpeg::ChoiceExpression>(choices);
+    auto repeat = std::make_shared<ufpeg::RepeatExpression>(choice);
+    auto instructions = repeat->compile();
 
     Py_RETURN_NONE;
 }
