@@ -50,7 +50,7 @@ namespace ufpeg {
     class PrepareInstruction: public Instruction {
     public:
         void execute(ExecutorContext &context) const {
-            context.nodes.push({ nullptr, context.cursors.top() });
+            context.nodes.push({ context.cursors.top() });
 
             context.pointers.top()++;
         }
@@ -67,7 +67,6 @@ namespace ufpeg {
         void execute(ExecutorContext &context) const {
             auto child = std::move(context.nodes.top());
             context.nodes.pop();
-            child.name = this->name.c_str();
             child.stop = context.cursors.top();
             auto &parent = context.nodes.top();
             parent.children.push_back(child);

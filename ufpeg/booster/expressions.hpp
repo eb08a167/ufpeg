@@ -38,8 +38,8 @@ namespace ufpeg {
                 auto item_instructions = (*it)->compile();
                 instructions.insert(
                     instructions.end(),
-                    item_instructions.rbegin(),
-                    item_instructions.rend()
+                    std::make_move_iterator(item_instructions.rbegin()),
+                    std::make_move_iterator(item_instructions.rend())
                 );
 
                 success = instructions.back();
@@ -79,8 +79,8 @@ namespace ufpeg {
                 auto choice_instructions = (*it)->compile();
                 instructions.insert(
                     instructions.end(),
-                    choice_instructions.rbegin(),
-                    choice_instructions.rend()
+                    std::make_move_iterator(choice_instructions.rbegin()),
+                    std::make_move_iterator(choice_instructions.rend())
                 );
 
                 failure = instructions.back();
