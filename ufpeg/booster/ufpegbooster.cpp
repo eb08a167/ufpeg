@@ -45,7 +45,8 @@ PyObject *run(PyObject *self, PyObject *args) {
     };
     auto choice = std::make_shared<ufpeg::SequenceExpression>(choices);
     auto repeat = std::make_shared<ufpeg::RepeatExpression>(choice);
-    auto instructions = repeat->compile();
+    ufpeg::Compiler compiler;
+    compiler.compile(repeat);
 
     Py_RETURN_NONE;
 }

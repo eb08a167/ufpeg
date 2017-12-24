@@ -6,7 +6,20 @@
 namespace ufpeg {
     class Compiler {
     public:
-        void compile();
+        std::vector<std::shared_ptr<Instruction>> compile(const std::shared_ptr<Expression> &root) {
+            CompilerContext context;
+
+            auto instructions = root->compile(context);
+
+            for (auto it = instructions.begin(); it != instructions.end(); ++it) {
+                auto &reference = (*it)->get_reference();
+                auto offset = std::distance(instructions.begin(), it);
+
+                reference->resolve(offset);
+            }
+
+            return instructions;
+        }
     };
 }
 

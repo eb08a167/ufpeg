@@ -4,13 +4,14 @@
 #include <algorithm>
 
 #include "instructions.hpp"
+#include "compilercontext.hpp"
 
 namespace ufpeg {
     class Expression {
     public:
         virtual ~Expression() = default;
 
-        virtual std::vector<std::shared_ptr<Instruction>> compile() const = 0;
+        virtual std::vector<std::shared_ptr<Instruction>> compile(CompilerContext&) const = 0;
     };
 
     class SequenceExpression: public Expression {
@@ -24,7 +25,7 @@ namespace ufpeg {
                 }
             }
 
-        std::vector<std::shared_ptr<Instruction>> compile() const {
+        std::vector<std::shared_ptr<Instruction>> compile(CompilerContext &context) const {
             auto pass = std::make_shared<PassInstruction>();
             auto abort = std::make_shared<AbortInstruction>();
             auto jump = std::make_shared<JumpInstruction>(pass->get_reference());
@@ -41,7 +42,7 @@ namespace ufpeg {
                 );
                 instructions.emplace_back(branch);
 
-                auto item_instructions = (*it)->compile();
+                auto item_instructions = (*it)->compile(context);
                 instructions.insert(
                     instructions.end(),
                     std::make_move_iterator(item_instructions.rbegin()),
@@ -72,7 +73,7 @@ namespace ufpeg {
                 }
             }
 
-        std::vector<std::shared_ptr<Instruction>> compile() const {
+        std::vector<std::shared_ptr<Instruction>> compile(CompilerContext &context) const {
             auto pass = std::make_shared<PassInstruction>();
 
             std::vector<std::shared_ptr<Instruction>> instructions = { pass };
@@ -88,7 +89,7 @@ namespace ufpeg {
                     instructions.emplace_back(branch);
                 }
 
-                auto choice_instructions = (*it)->compile();
+                auto choice_instructions = (*it)->compile(context);
                 instructions.insert(
                     instructions.end(),
                     std::make_move_iterator(choice_instructions.rbegin()),
@@ -111,7 +112,7 @@ namespace ufpeg {
         LiteralExpression(const std::u32string &literal):
             literal(literal) {}
 
-        std::vector<std::shared_ptr<Instruction>> compile() const {
+        std::vector<std::shared_ptr<Instruction>> compile(CompilerContext&) const {
             return { std::make_shared<MatchLiteralInstruction>(this->literal) };
         }
     private:
@@ -123,9 +124,9 @@ namespace ufpeg {
         RepeatExpression(const std::shared_ptr<Expression> &item):
             item(item) {}
 
-        std::vector<std::shared_ptr<Instruction>> compile() const {
+        std::vector<std::shared_ptr<Instruction>> compile(CompilerContext &context) const {
             auto pass = std::make_shared<PassInstruction>();
-            auto instructions = this->item->compile();
+            auto instructions = this->item->compile(context);
             auto &success = pass;
             auto &failure = instructions.front();
             auto branch = std::make_shared<BranchInstruction>(
