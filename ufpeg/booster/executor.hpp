@@ -13,7 +13,7 @@ namespace ufpeg {
             ExecutorContext context = { text };
             context.pointers.push(0);
             context.cursors.push(0);
-            context.nodes.push({});
+            context.nodes.push({ nullptr });
             context.offset = 0;
             context.has_matched = true;
 

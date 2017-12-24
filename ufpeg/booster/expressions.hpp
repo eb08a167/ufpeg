@@ -16,7 +16,13 @@ namespace ufpeg {
     class SequenceExpression: public Expression {
     public:
         SequenceExpression(const std::vector<std::shared_ptr<Expression>> &items):
-            items(items) {}
+            items(items) {
+                if (this->items.empty()) {
+                    throw std::logic_error(
+                        "SequenceExpression with no items does not make any sense"
+                    );
+                }
+            }
 
         std::vector<std::shared_ptr<Instruction>> compile() const {
             auto pass = std::make_shared<PassInstruction>();
@@ -58,7 +64,13 @@ namespace ufpeg {
     class ChoiceExpression: public Expression {
     public:
         ChoiceExpression(const std::vector<std::shared_ptr<Expression>> &choices):
-            choices(choices) {}
+            choices(choices) {
+                if (this->choices.empty()) {
+                    throw std::logic_error(
+                        "ChoiceExpression with no choices does not make any sense"
+                    );
+                }
+            }
 
         std::vector<std::shared_ptr<Instruction>> compile() const {
             auto pass = std::make_shared<PassInstruction>();

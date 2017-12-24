@@ -34,10 +34,10 @@ namespace ufpeg {
         void execute(ExecutorContext &context) const {
             context.pointers.top()++;
 
-            //context.pointers.push(this->target);
+            context.pointers.push(this->target->get_offset());
         }
     private:
-        const std::shared_ptr<Reference> &target;
+        const std::shared_ptr<Reference> target;
     };
 
     class RevokeInstruction: public Instruction {
@@ -50,7 +50,7 @@ namespace ufpeg {
     class PrepareInstruction: public Instruction {
     public:
         void execute(ExecutorContext &context) const {
-            context.nodes.push({ context.cursors.top() });
+            context.nodes.push({ nullptr, context.cursors.top() });
 
             context.pointers.top()++;
         }
@@ -67,6 +67,7 @@ namespace ufpeg {
         void execute(ExecutorContext &context) const {
             auto child = std::move(context.nodes.top());
             context.nodes.pop();
+            child.name = this->name.c_str();
             child.stop = context.cursors.top();
             auto &parent = context.nodes.top();
             parent.children.push_back(child);
@@ -152,11 +153,12 @@ namespace ufpeg {
             Instruction(reference), success(success), failure(failure) {}
 
         void execute(ExecutorContext &context) const {
-            //auto &pointer = context.pointers.top();
-            //pointer = context.has_matched ? this->success : this->failure;
+            auto &target = context.has_matched ? this->success : this->failure;
+
+            context.pointers.top() = target->get_offset();
         }
     private:
-        const std::shared_ptr<Reference> &success, &failure;
+        const std::shared_ptr<Reference> success, failure;
     };
 
     class JumpInstruction: public Instruction {
@@ -168,7 +170,7 @@ namespace ufpeg {
             Instruction(reference), target(target) {}
 
         void execute(ExecutorContext &context) const {
-            //context.pointers.top() = this->pointer;
+            context.pointers.top() = this->target->get_offset();
         }
     private:
         const std::shared_ptr<Reference> &target;
