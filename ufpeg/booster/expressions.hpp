@@ -1,17 +1,17 @@
 #ifndef UFPEG_EXPRESSIONS_HPP
 #define UFPEG_EXPRESSIONS_HPP
 
+#include <vector>
 #include <algorithm>
 
 #include "instructions.hpp"
-#include "compilercontext.hpp"
 
 namespace ufpeg {
     class Expression {
     public:
         virtual ~Expression() = default;
 
-        virtual std::vector<std::shared_ptr<Instruction>> compile(CompilerContext&) const = 0;
+        virtual std::vector<std::shared_ptr<SmartInstruction>> compile(CompilerContext&) const = 0;
     };
 
     class SequenceExpression: public Expression {
@@ -25,15 +25,15 @@ namespace ufpeg {
                 }
             }
 
-        std::vector<std::shared_ptr<Instruction>> compile(CompilerContext &context) const {
+        std::vector<std::shared_ptr<SmartInstruction>> compile(CompilerContext &context) const {
             auto pass = std::make_shared<PassInstruction>();
             auto abort = std::make_shared<AbortInstruction>();
             auto jump = std::make_shared<JumpInstruction>(pass->get_reference());
             auto commit = std::make_shared<CommitInstruction>();
 
-            std::vector<std::shared_ptr<Instruction>> instructions = { pass, abort, jump, commit };
+            std::vector<std::shared_ptr<SmartInstruction>> instructions = { pass, abort, jump, commit };
 
-            std::shared_ptr<Instruction> success = commit, failure = abort;
+            std::shared_ptr<SmartInstruction> success = commit, failure = abort;
 
             for (auto it = this->items.rbegin(); it != this->items.rend(); ++it) {
                 auto branch = std::make_shared<BranchInstruction>(
@@ -73,12 +73,12 @@ namespace ufpeg {
                 }
             }
 
-        std::vector<std::shared_ptr<Instruction>> compile(CompilerContext &context) const {
+        std::vector<std::shared_ptr<SmartInstruction>> compile(CompilerContext &context) const {
             auto pass = std::make_shared<PassInstruction>();
 
-            std::vector<std::shared_ptr<Instruction>> instructions = { pass };
+            std::vector<std::shared_ptr<SmartInstruction>> instructions = { pass };
 
-            std::shared_ptr<Instruction> success = pass, failure = pass;
+            std::shared_ptr<SmartInstruction> success = pass, failure = pass;
 
             for (auto it = this->choices.rbegin(); it != this->choices.rend(); ++it) {
                 if (success != failure) {
@@ -112,7 +112,7 @@ namespace ufpeg {
         LiteralExpression(const std::u32string &literal):
             literal(literal) {}
 
-        std::vector<std::shared_ptr<Instruction>> compile(CompilerContext&) const {
+        std::vector<std::shared_ptr<SmartInstruction>> compile(CompilerContext&) const {
             return { std::make_shared<MatchLiteralInstruction>(this->literal) };
         }
     private:
@@ -124,7 +124,7 @@ namespace ufpeg {
         RepeatExpression(const std::shared_ptr<Expression> &item):
             item(item) {}
 
-        std::vector<std::shared_ptr<Instruction>> compile(CompilerContext &context) const {
+        std::vector<std::shared_ptr<SmartInstruction>> compile(CompilerContext &context) const {
             auto pass = std::make_shared<PassInstruction>();
             auto instructions = this->item->compile(context);
             auto &success = pass;

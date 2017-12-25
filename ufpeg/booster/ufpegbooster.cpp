@@ -1,8 +1,8 @@
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
 
-#include "executor.hpp"
 #include "compiler.hpp"
+#include "virtualmachine.hpp"
 
 std::u32string to_u32string(PyObject *pytext) {
     if (!PyUnicode_Check(pytext)) {
@@ -43,10 +43,12 @@ PyObject *run(PyObject *self, PyObject *args) {
         std::make_shared<ufpeg::LiteralExpression>(U"foo"),
         std::make_shared<ufpeg::LiteralExpression>(U"bar"),
     };
-    auto choice = std::make_shared<ufpeg::SequenceExpression>(choices);
+    auto choice = std::make_shared<ufpeg::ChoiceExpression>(choices);
     auto repeat = std::make_shared<ufpeg::RepeatExpression>(choice);
     ufpeg::Compiler compiler;
-    compiler.compile(repeat);
+    auto instructions = compiler.compile(repeat);
+    ufpeg::VirtualMachine virtual_machine;
+    virtual_machine.execute(instructions, grammar);
 
     Py_RETURN_NONE;
 }
