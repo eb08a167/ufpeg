@@ -38,13 +38,14 @@ namespace ufpeg {
 
             for (auto it = this->items.rbegin(); it != this->items.rend(); ++it) {
                 auto item_instructions = (*it)->compile(context, success, failure);
+
+                success = item_instructions.back()->get_reference();
+
                 instructions.insert(
                     instructions.end(),
                     std::make_move_iterator(item_instructions.rbegin()),
                     std::make_move_iterator(item_instructions.rend())
                 );
-
-                success = instructions.back()->get_reference();
             }
 
             instructions.emplace_back(std::make_shared<BeginInstruction>(success));
@@ -75,13 +76,14 @@ namespace ufpeg {
 
             for (auto it = this->choices.rbegin(); it != this->choices.rend(); ++it) {
                 auto choice_instructions = (*it)->compile(context, success, failure);
+
+                failure = choice_instructions.back()->get_reference();
+
                 instructions.insert(
                     instructions.end(),
                     std::make_move_iterator(choice_instructions.rbegin()),
                     std::make_move_iterator(choice_instructions.rend())
                 );
-
-                failure = instructions.back()->get_reference();
             }
 
             std::reverse(instructions.begin(), instructions.end());
@@ -108,9 +110,25 @@ namespace ufpeg {
         const std::u32string literal;
     };
 
-    class RepeatExpression: public Expression {
+    class ZeroOrOneExpression: public Expression {
     public:
-        RepeatExpression(const std::shared_ptr<Expression> &item):
+        ZeroOrOneExpression(const std::shared_ptr<Expression> &item):
+            item(item) {}
+
+        std::vector<std::shared_ptr<Instruction>> compile(
+            CompilerContext &context,
+            std::shared_ptr<Reference> success,
+            std::shared_ptr<Reference> failure
+        ) const {
+            return this->item->compile(context, success, success);
+        }
+    private:
+        const std::shared_ptr<Expression> item;
+    };
+
+    class ZeroOrMoreExpression: public Expression {
+    public:
+        ZeroOrMoreExpression(const std::shared_ptr<Expression> &item):
             item(item) {}
 
         std::vector<std::shared_ptr<Instruction>> compile(
@@ -126,6 +144,27 @@ namespace ufpeg {
             instructions.emplace_back(jump);
 
             return instructions;
+        }
+    private:
+        const std::shared_ptr<Expression> item;
+    };
+
+    class OneOrMoreExpression: public Expression {
+    public:
+        OneOrMoreExpression(const std::shared_ptr<Expression> &item):
+            item(item) {}
+
+        std::vector<std::shared_ptr<Instruction>> compile(
+            CompilerContext &context,
+            std::shared_ptr<Reference> success,
+            std::shared_ptr<Reference> failure
+        ) const {
+            SequenceExpression expression({
+                this->item,
+                std::make_shared<ZeroOrMoreExpression>(this->item),
+            });
+
+            return expression.compile(context, success, failure);
         }
     private:
         const std::shared_ptr<Expression> item;
