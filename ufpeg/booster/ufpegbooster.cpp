@@ -2,7 +2,7 @@
 #include <Python.h>
 
 #include "compiler.hpp"
-#include "virtualmachine.hpp"
+//#include "virtualmachine.hpp"
 
 std::u32string to_u32string(PyObject *pytext) {
     if (!PyUnicode_Check(pytext)) {
@@ -47,8 +47,8 @@ PyObject *run(PyObject *self, PyObject *args) {
     auto repeat = std::make_shared<ufpeg::RepeatExpression>(choice);
     ufpeg::Compiler compiler;
     auto instructions = compiler.compile(repeat);
-    ufpeg::VirtualMachine virtual_machine;
-    virtual_machine.execute(instructions, grammar);
+    // ufpeg::VirtualMachine virtual_machine;
+    // virtual_machine.execute(instructions, grammar);
 
     Py_RETURN_NONE;
 }

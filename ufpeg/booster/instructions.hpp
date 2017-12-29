@@ -1,24 +1,20 @@
 #ifndef UFPEG_INSTRUCTIONS_HPP
 #define UFPEG_INSTRUCTIONS_HPP
 
-#include "opcode.hpp"
-#include "compilercontext.hpp"
+#include <memory>
+
+#include "reference.hpp"
+#include "executorcontext.hpp"
 
 namespace ufpeg {
-    struct RawInstruction {
-        OpCode op_code;
-        std::u32string name, literal;
-        std::size_t target, success, failure;
-    };
-
-    class SmartInstruction {
+    class Instruction {
     public:
-        SmartInstruction(const std::shared_ptr<Reference> &reference = {}):
+        Instruction(const std::shared_ptr<Reference> &reference = {}):
             reference(reference ? reference : std::make_shared<Reference>()) {}
 
-        virtual ~SmartInstruction() = default;
+        virtual ~Instruction() = default;
 
-        virtual RawInstruction to_raw(CompilerContext&) const = 0;
+        virtual void update(ExecutorContext &context) const = 0;
 
         const std::shared_ptr<Reference> &get_reference() const {
             return this->reference;
@@ -27,176 +23,221 @@ namespace ufpeg {
         const std::shared_ptr<Reference> reference;
     };
 
-    class InvokeInstruction: public SmartInstruction {
+    class InvokeInstruction: public Instruction {
     public:
         InvokeInstruction(
             const std::shared_ptr<Reference> &target,
+            const std::shared_ptr<Reference> &success,
+            const std::shared_ptr<Reference> &failure,
             const std::shared_ptr<Reference> &reference = {}
         ):
-            SmartInstruction(reference), target(target) {}
+            Instruction(reference), target(target), success(success), failure(failure) {}
 
-        RawInstruction to_raw(CompilerContext &context) const {
-            RawInstruction instruction = { OpCode::INVOKE };
+        void update(ExecutorContext &context) const {
+            context.pointer = this->target->get_offset();
 
-            instruction.target = this->target->get_offset();
+            context.frames.push({
+                this->success->get_offset(),
+                this->failure->get_offset(),
+            });
+        }
+    private:
+        const std::shared_ptr<Reference> target, success, failure;
+    };
 
-            return instruction;
+    class RevokeSuccessInstruction: public Instruction {
+    public:
+        void update(ExecutorContext &context) const {
+            context.pointer = context.frames.top().success;
+
+            context.frames.pop();
+        }
+    };
+
+    class RevokeFailureInstruction: public Instruction {
+    public:
+        void update(ExecutorContext &context) const {
+            context.pointer = context.frames.top().failure;
+
+            context.frames.pop();
+        }
+    };
+
+    class PrepareInstruction: public Instruction {
+    public:
+        PrepareInstruction(
+            const std::shared_ptr<Reference> &target,
+            const std::shared_ptr<Reference> &reference = {}
+        ):
+            Instruction(reference), target(target) {}
+
+        void update(ExecutorContext &context) const {
+            context.nodes.push({ nullptr, context.cursors.top() });
+
+            context.pointer = this->target->get_offset();
         }
     private:
         const std::shared_ptr<Reference> target;
     };
 
-    class RevokeInstruction: public SmartInstruction {
-    public:
-        RawInstruction to_raw(CompilerContext&) const {
-            return { OpCode::REVOKE };
-        }
-    };
-
-    class PrepareInstruction: public SmartInstruction {
-    public:
-        RawInstruction to_raw(CompilerContext&) const {
-            return { OpCode::PREPARE };
-        }
-    };
-
-    class ConsumeInstruction: public SmartInstruction {
+    class ConsumeInstruction: public Instruction {
     public:
         ConsumeInstruction(
             const std::u32string &name,
+            const std::shared_ptr<Reference> &target,
             const std::shared_ptr<Reference> &reference = {}
         ):
-            SmartInstruction(reference), name(name) {}
+            Instruction(reference), name(name), target(target) {}
 
-        RawInstruction to_raw(CompilerContext&) const {
-            RawInstruction instruction = { OpCode::CONSUME };
+        void update(ExecutorContext &context) const {
+            auto child = std::move(context.nodes.top());
+            context.nodes.pop();
+            child.name = this->name.c_str();
+            child.stop = context.cursors.top();
+            auto &parent = context.nodes.top();
+            parent.children.emplace_back(child);
 
-            instruction.name = this->name;
-
-            return instruction;
+            context.pointer = this->target->get_offset();
         }
     private:
         const std::u32string name;
+        const std::shared_ptr<Reference> target;
     };
 
-    class DiscardInstruction: public SmartInstruction {
+    class DiscardInstruction: public Instruction {
     public:
-        RawInstruction to_raw(CompilerContext&) const {
-            return { OpCode::DISCARD };
+        DiscardInstruction(
+            const std::shared_ptr<Reference> &target,
+            const std::shared_ptr<Reference> &reference = {}
+        ):
+            Instruction(reference), target(target) {}
+
+        void update(ExecutorContext &context) const {
+            context.nodes.pop();
+
+            context.pointer = this->target->get_offset();
         }
+    private:
+        const std::shared_ptr<Reference> target;
     };
 
-    class BeginInstruction: public SmartInstruction {
+    class BeginInstruction: public Instruction {
     public:
-        RawInstruction to_raw(CompilerContext&) const {
-            return { OpCode::BEGIN };
+        BeginInstruction(
+            const std::shared_ptr<Reference> &target,
+            const std::shared_ptr<Reference> &reference = {}
+        ):
+            Instruction(reference), target(target) {}
+
+        void update(ExecutorContext &context) const {
+            auto cursor = context.cursors.top();
+            context.cursors.push(cursor);
+
+            context.pointer = this->target->get_offset();
         }
+    private:
+        const std::shared_ptr<Reference> target;
     };
 
-    class CommitInstruction: public SmartInstruction {
+    class CommitInstruction: public Instruction {
     public:
-        RawInstruction to_raw(CompilerContext&) const {
-            return { OpCode::COMMIT };
+        CommitInstruction(
+            const std::shared_ptr<Reference> &target,
+            const std::shared_ptr<Reference> &reference = {}
+        ):
+            Instruction(reference), target(target) {}
+
+        void update(ExecutorContext &context) const {
+            auto cursor = context.cursors.top();
+            context.cursors.pop();
+            context.cursors.top() = cursor;
+
+            context.pointer = this->target->get_offset();
         }
+    private:
+        const std::shared_ptr<Reference> target;
     };
 
-    class AbortInstruction: public SmartInstruction {
+    class AbortInstruction: public Instruction {
     public:
-        RawInstruction to_raw(CompilerContext&) const {
-            return { OpCode::ABORT };
+        AbortInstruction(
+            const std::shared_ptr<Reference> &target,
+            const std::shared_ptr<Reference> &reference = {}
+        ):
+            Instruction(reference), target(target) {}
+
+        void update(ExecutorContext &context) const {
+            context.cursors.pop();
+
+            context.pointer = this->target->get_offset();
         }
+    private:
+        const std::shared_ptr<Reference> target;
     };
 
-    class MatchLiteralInstruction: public SmartInstruction {
+    class MatchLiteralInstruction: public Instruction {
     public:
         MatchLiteralInstruction(
             const std::u32string &literal,
-            const std::shared_ptr<Reference> &reference = {}
-        ):
-            SmartInstruction(reference), literal(literal) {}
-
-        RawInstruction to_raw(CompilerContext&) const {
-            RawInstruction instruction = { OpCode::MATCH_LITERAL };
-
-            instruction.literal = this->literal;
-
-            return instruction;
-        }
-    private:
-        const std::u32string literal;
-    };
-
-    class BranchInstruction: public SmartInstruction {
-    public:
-        BranchInstruction(
             const std::shared_ptr<Reference> &success,
             const std::shared_ptr<Reference> &failure,
             const std::shared_ptr<Reference> &reference = {}
         ):
-            SmartInstruction(reference), success(success), failure(failure) {}
+            Instruction(reference), literal(literal), success(success), failure(failure) {}
 
-        RawInstruction to_raw(CompilerContext &context) const {
-            RawInstruction instruction = { OpCode::BRANCH };
+        void update(ExecutorContext &context) const {
+            auto &cursor = context.cursors.top();
+            const auto length = this->literal.length();
 
-            instruction.success = this->success->get_offset();
-            instruction.failure = this->failure->get_offset();
-
-            return instruction;
+            if (context.text.compare(cursor, length, this->literal)) {
+                context.pointer = this->failure->get_offset();
+            } else {
+                cursor += length;
+                context.pointer = this->success->get_offset();
+            }
         }
     private:
+        const std::u32string literal;
         const std::shared_ptr<Reference> success, failure;
     };
 
-    class JumpInstruction: public SmartInstruction {
+    class JumpInstruction: public Instruction {
     public:
         JumpInstruction(
             const std::shared_ptr<Reference> &target,
             const std::shared_ptr<Reference> &reference = {}
         ):
-            SmartInstruction(reference), target(target) {}
+            Instruction(reference), target(target) {}
 
-        RawInstruction to_raw(CompilerContext &context) const {
-            RawInstruction instruction = { OpCode::JUMP };
-
-            instruction.target = this->target->get_offset();
-
-            return instruction;
+        void update(ExecutorContext &context) const {
+            context.pointer = this->target->get_offset();
         }
     private:
-        const std::shared_ptr<Reference> &target;
+        const std::shared_ptr<Reference> target;
     };
 
-    class PassInstruction: public SmartInstruction {
-    public:
-        RawInstruction to_raw(CompilerContext&) const {
-            return { OpCode::PASS };
-        }
-    };
-
-    class FlipInstruction: public SmartInstruction {
-    public:
-        RawInstruction to_raw(CompilerContext&) const {
-            return { OpCode::FLIP };
-        }
-    };
-
-    class ExpectInstruction: public SmartInstruction {
+    class ExpectInstruction: public Instruction {
     public:
         ExpectInstruction(
             const std::u32string &name,
+            const std::shared_ptr<Reference> &target,
             const std::shared_ptr<Reference> &reference = {}
         ):
-            SmartInstruction(reference), name(name) {}
+            Instruction(reference), name(name) {}
 
-        RawInstruction to_raw(CompilerContext&) const {
-            RawInstruction instruction = { OpCode::EXPECT };
+        void update(ExecutorContext &context) const {
+            auto cursor = context.cursors.top();
+            if (cursor > context.offset) {
+                context.expectations.clear();
+                context.offset = cursor;
+            }
+            context.expectations.push_back(this->name.c_str());
 
-            instruction.name = this->name;
-
-            return instruction;
+            context.pointer = this->target->get_offset();
         }
     private:
         const std::u32string name;
+        const std::shared_ptr<Reference> target;
     };
 }
 
