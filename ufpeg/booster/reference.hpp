@@ -7,8 +7,12 @@ namespace ufpeg {
     class Reference {
     public:
         void resolve(std::size_t offset) {
-            this->offset = offset;
-            this->is_resolved = true;
+            if (this->is_resolved) {
+                throw std::logic_error("Reference has already been resolved");
+            } else {
+                this->offset = offset;
+                this->is_resolved = true;
+            }
         }
 
         std::size_t get_offset() const {

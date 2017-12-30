@@ -5,6 +5,7 @@
 
 #include "instructions.hpp"
 #include "compilercontext.hpp"
+#include "compileoptions.hpp"
 
 namespace ufpeg {
     class Expression {
@@ -13,8 +14,7 @@ namespace ufpeg {
 
         virtual std::vector<std::shared_ptr<Instruction>> compile(
             CompilerContext &context,
-            std::shared_ptr<Reference> success,
-            std::shared_ptr<Reference> failure
+            const CompileOptions &options = {}
         ) const = 0;
     };
 
@@ -25,30 +25,32 @@ namespace ufpeg {
 
         std::vector<std::shared_ptr<Instruction>> compile(
             CompilerContext &context,
-            std::shared_ptr<Reference> success,
-            std::shared_ptr<Reference> failure
+            const CompileOptions &options = {}
         ) const {
-            auto commit = std::make_shared<CommitInstruction>(success);
-            auto abort = std::make_shared<AbortInstruction>(failure);
+            auto commit = std::make_shared<CommitInstruction>(options.success);
+            auto abort = std::make_shared<AbortInstruction>(options.failure);
 
             std::vector<std::shared_ptr<Instruction>> instructions = { abort, commit };
 
-            success = commit->get_reference();
-            failure = abort->get_reference();
+            auto success = commit->get_reference();
+            auto failure = abort->get_reference();
 
             for (auto it = this->items.rbegin(); it != this->items.rend(); ++it) {
-                auto item_instructions = (*it)->compile(context, success, failure);
-
-                success = item_instructions.back()->get_reference();
+                auto entry = std::make_shared<Reference>();
+                auto item_instructions = (*it)->compile(context, { success, failure, entry });
 
                 instructions.insert(
                     instructions.end(),
-                    std::make_move_iterator(item_instructions.rbegin()),
-                    std::make_move_iterator(item_instructions.rend())
+                    item_instructions.rbegin(),
+                    item_instructions.rend()
                 );
+
+                success = entry;
             }
 
-            instructions.emplace_back(std::make_shared<BeginInstruction>(success));
+            instructions.emplace_back(
+                std::make_shared<BeginInstruction>(success, options.entry)
+            );
 
             std::reverse(instructions.begin(), instructions.end());
 
@@ -60,30 +62,36 @@ namespace ufpeg {
 
     class ChoiceExpression: public Expression {
     public:
-        ChoiceExpression(const std::vector<std::shared_ptr<Expression>> &choices):
-            choices(choices) {}
+        ChoiceExpression(const std::vector<std::shared_ptr<Expression>> &items):
+            items(items) {}
 
         std::vector<std::shared_ptr<Instruction>> compile(
             CompilerContext &context,
-            std::shared_ptr<Reference> success,
-            std::shared_ptr<Reference> failure
+            const CompileOptions &options = {}
         ) const {
-            auto jump = std::make_shared<JumpInstruction>(failure);
+            if (this->items.empty()) {
+                return {
+                    std::make_shared<JumpInstruction>(options.failure, options.entry),
+                };
+            }
 
-            std::vector<std::shared_ptr<Instruction>> instructions = { jump };
+            std::vector<std::shared_ptr<Instruction>> instructions;
 
-            failure = jump->get_reference();
+            auto success = options.success;
+            auto failure = options.failure;
 
-            for (auto it = this->choices.rbegin(); it != this->choices.rend(); ++it) {
-                auto choice_instructions = (*it)->compile(context, success, failure);
-
-                failure = choice_instructions.back()->get_reference();
+            for (auto it = this->items.rbegin(); it != this->items.rend(); ++it) {
+                auto entry = std::next(it) == this->items.rend() ?
+                    options.entry : std::make_shared<Reference>();
+                auto item_instructions = (*it)->compile(context, { success, failure, entry });
 
                 instructions.insert(
                     instructions.end(),
-                    std::make_move_iterator(choice_instructions.rbegin()),
-                    std::make_move_iterator(choice_instructions.rend())
+                    item_instructions.rbegin(),
+                    item_instructions.rend()
                 );
+
+                failure = entry;
             }
 
             std::reverse(instructions.begin(), instructions.end());
@@ -91,7 +99,7 @@ namespace ufpeg {
             return instructions;
         }
     private:
-        const std::vector<std::shared_ptr<Expression>> choices;
+        const std::vector<std::shared_ptr<Expression>> items;
     };
 
     class LiteralExpression: public Expression {
@@ -101,13 +109,35 @@ namespace ufpeg {
 
         std::vector<std::shared_ptr<Instruction>> compile(
             CompilerContext &context,
-            std::shared_ptr<Reference> success,
-            std::shared_ptr<Reference> failure
+            const CompileOptions &options = {}
         ) const {
-            return { std::make_shared<MatchLiteralInstruction>(this->literal, success, failure) };
+            return {
+                std::make_shared<MatchLiteralInstruction>(
+                    this->literal, options.success, options.failure, options.entry
+                ),
+            };
         }
     private:
         const std::u32string literal;
+    };
+
+    class RangeExpression: public Expression {
+    public:
+        RangeExpression(char32_t min, char32_t max):
+            min(min), max(max) {}
+
+        std::vector<std::shared_ptr<Instruction>> compile(
+            CompilerContext &context,
+            const CompileOptions &options = {}
+        ) const {
+            return {
+                std::make_shared<MatchRangeInstruction>(
+                    this->min, this->max, options.success, options.failure, options.entry
+                ),
+            };
+        }
+    private:
+        const char32_t min, max;
     };
 
     class ZeroOrOneExpression: public Expression {
@@ -117,10 +147,11 @@ namespace ufpeg {
 
         std::vector<std::shared_ptr<Instruction>> compile(
             CompilerContext &context,
-            std::shared_ptr<Reference> success,
-            std::shared_ptr<Reference> failure
+            const CompileOptions &options = {}
         ) const {
-            return this->item->compile(context, success, success);
+            return this->item->compile(context, {
+                options.success, options.success, options.entry,
+            });
         }
     private:
         const std::shared_ptr<Expression> item;
@@ -133,17 +164,9 @@ namespace ufpeg {
 
         std::vector<std::shared_ptr<Instruction>> compile(
             CompilerContext &context,
-            std::shared_ptr<Reference> success,
-            std::shared_ptr<Reference> failure
+            const CompileOptions &options = {}
         ) const {
-            auto reference = std::make_shared<Reference>();
-            auto instructions = this->item->compile(context, reference, success);
-            auto target = instructions.front()->get_reference();
-            auto jump = std::make_shared<JumpInstruction>(target, reference);
-
-            instructions.emplace_back(jump);
-
-            return instructions;
+            return this->item->compile(context, { options.entry, options.success, options.entry });
         }
     private:
         const std::shared_ptr<Expression> item;
@@ -156,39 +179,164 @@ namespace ufpeg {
 
         std::vector<std::shared_ptr<Instruction>> compile(
             CompilerContext &context,
-            std::shared_ptr<Reference> success,
-            std::shared_ptr<Reference> failure
+            const CompileOptions &options = {}
         ) const {
             SequenceExpression expression({
                 this->item,
                 std::make_shared<ZeroOrMoreExpression>(this->item),
             });
 
-            return expression.compile(context, success, failure);
+            return expression.compile(context, options);
         }
     private:
+        const std::shared_ptr<Expression> item;
+    };
+
+    class NotExpression: public Expression {
+    public:
+        NotExpression(const std::shared_ptr<Expression> &item):
+            item(item) {}
+
+        std::vector<std::shared_ptr<Instruction>> compile(
+            CompilerContext &context,
+            const CompileOptions &options = {}
+        ) const {
+            auto entry = std::make_shared<Reference>();
+
+            auto begin = std::make_shared<BeginInstruction>(entry, options.entry);
+            auto abort_success = std::make_shared<AbortInstruction>(options.success);
+            auto abort_failure = std::make_shared<AbortInstruction>(options.failure);
+
+            auto instructions = this->item->compile(
+                context, {
+                    abort_failure->get_reference(),
+                    abort_success->get_reference(),
+                    entry,
+                }
+            );
+
+            instructions.emplace(instructions.begin(), begin);
+            instructions.emplace_back(abort_failure);
+            instructions.emplace_back(abort_success);
+
+            return instructions;
+        }
+    private:
+        const std::shared_ptr<Expression> item;
+    };
+
+    class AndExpression: public Expression {
+    public:
+        AndExpression(const std::shared_ptr<Expression> &item):
+            item(item) {}
+
+        std::vector<std::shared_ptr<Instruction>> compile(
+            CompilerContext &context,
+            const CompileOptions &options = {}
+        ) const {
+            auto entry = std::make_shared<Reference>();
+
+            auto begin = std::make_shared<BeginInstruction>(entry, options.entry);
+            auto abort_success = std::make_shared<AbortInstruction>(options.success);
+            auto abort_failure = std::make_shared<AbortInstruction>(options.failure);
+
+            auto instructions = this->item->compile(
+                context, {
+                    abort_success->get_reference(),
+                    abort_failure->get_reference(),
+                    entry,
+                }
+            );
+
+            instructions.emplace(instructions.begin(), begin);
+            instructions.emplace_back(abort_success);
+            instructions.emplace_back(abort_failure);
+
+            return instructions;
+        }
+    private:
+        const std::shared_ptr<Expression> item;
+    };
+
+    class RuleReferenceExpression: public Expression {
+    public:
+        RuleReferenceExpression(const std::u32string &name):
+            name(name) {}
+
+        std::vector<std::shared_ptr<Instruction>> compile(
+            CompilerContext &context,
+            const CompileOptions &options = {}
+        ) const {
+            std::shared_ptr<Reference> target;
+
+            try {
+                target = context.references.at(this->name);
+            } catch (const std::out_of_range&) {
+                target = std::make_shared<Reference>();
+                context.references.insert({ this->name, target });
+            }
+
+            return {
+                std::make_shared<InvokeInstruction>(
+                    target, options.success, options.failure, options.entry
+                ),
+            };
+        }
+    private:
+        const std::u32string name;
+    };
+
+    class RuleDefinitionExpression: public Expression {
+    public:
+        RuleDefinitionExpression(
+            const std::u32string &name,
+            const std::shared_ptr<Expression> &item
+        ):
+            name(name), item(item) {}
+
+        std::vector<std::shared_ptr<Instruction>> compile(
+            CompilerContext &context,
+            const CompileOptions &options = {}
+        ) const {
+            std::shared_ptr<Reference> entry;
+
+            try {
+                entry = context.references.at(this->name);
+            } catch (const std::out_of_range&) {
+                entry = std::make_shared<Reference>();
+                context.references.insert({ this->name, entry });
+            }
+
+            auto target = std::make_shared<Reference>();
+
+            auto expect = std::make_shared<ExpectInstruction>(this->name, target);
+            auto prepare = std::make_shared<PrepareInstruction>(expect->get_reference(), entry);
+            auto revoke_success = std::make_shared<RevokeSuccessInstruction>();
+            auto consume = std::make_shared<ConsumeInstruction>(
+                this->name, revoke_success->get_reference()
+            );
+            auto revoke_failure = std::make_shared<RevokeFailureInstruction>();
+            auto discard = std::make_shared<DiscardInstruction>(revoke_failure->get_reference());
+
+            auto instructions = this->item->compile(
+                context, {
+                    consume->get_reference(),
+                    discard->get_reference(),
+                    target,
+                }
+            );
+
+            instructions.insert(instructions.begin(), { prepare, expect });
+            instructions.insert(instructions.end(), {
+                consume, revoke_success, discard, revoke_failure,
+            });
+
+            return instructions;
+        }
+    private:
+        const std::u32string name;
         const std::shared_ptr<Expression> item;
     };
 }
 
 #endif
-
-// L1: BEGIN L2
-// L2: MATCH_LITERAL "foo" L3 L5
-// L3: MATCH_LITERAL "bar" L4 L5
-// L4: COMMIT @success
-// L5: ABORT @failure
-
-// L1: MATCH_LITERAL "foo" @success L2
-// L2: MATCH_LITERAL "bar" @success L3
-// L3: JUMP @failure
-
-// L1: PREPARE L2
-// L2: MATCH_LITERAL "foobar" L3 L5
-// L3: CONSUME "node" L5
-// L4: DISCARD L6
-// L5: REVOKE_SUCCESS
-// L6: REVOKE_FAILURE
-
-// L1: MATCH_LITERAL "foo" L2 @success
-// L2: JUMP L1

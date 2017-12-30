@@ -39,14 +39,14 @@ PyObject *run(PyObject *self, PyObject *args) {
         return nullptr;
     }
 
-    std::vector<std::shared_ptr<ufpeg::Expression>> choices = {
+    std::vector<std::shared_ptr<ufpeg::Expression>> items = {
         std::make_shared<ufpeg::LiteralExpression>(U"foo"),
-        std::make_shared<ufpeg::LiteralExpression>(U"bar"),
     };
-    auto choice = std::make_shared<ufpeg::ChoiceExpression>(choices);
-    auto repeat = std::make_shared<ufpeg::RepeatExpression>(choice);
+    auto choice = std::make_shared<ufpeg::ChoiceExpression>(items);
+    auto repeat = std::make_shared<ufpeg::NotExpression>(choice);
+    auto rule = std::make_shared<ufpeg::RuleDefinitionExpression>(U"foobar", repeat);
     ufpeg::Compiler compiler;
-    auto instructions = compiler.compile(repeat);
+    auto instructions = compiler.compile(rule);
     // ufpeg::VirtualMachine virtual_machine;
     // virtual_machine.execute(instructions, grammar);
 

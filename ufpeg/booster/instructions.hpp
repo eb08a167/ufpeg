@@ -201,6 +201,32 @@ namespace ufpeg {
         const std::shared_ptr<Reference> success, failure;
     };
 
+    class MatchRangeInstruction: public Instruction {
+    public:
+        MatchRangeInstruction(
+            char32_t min, char32_t max,
+            const std::shared_ptr<Reference> &success,
+            const std::shared_ptr<Reference> &failure,
+            const std::shared_ptr<Reference> &reference = {}
+        ):
+            Instruction(reference), min(min), max(max), success(success), failure(failure) {}
+
+        void update(ExecutorContext &context) const {
+            auto &cursor = context.cursors.top();
+            const auto code = context.text.at(cursor);
+
+            if (this->min <= code && code <= this->max) {
+                cursor++;
+                context.pointer = this->success->get_offset();
+            } else {
+                context.pointer = this->failure->get_offset();
+            }
+        }
+    private:
+        const char32_t min, max;
+        const std::shared_ptr<Reference> success, failure;
+    };
+
     class JumpInstruction: public Instruction {
     public:
         JumpInstruction(
@@ -223,7 +249,7 @@ namespace ufpeg {
             const std::shared_ptr<Reference> &target,
             const std::shared_ptr<Reference> &reference = {}
         ):
-            Instruction(reference), name(name) {}
+            Instruction(reference), name(name), target(target) {}
 
         void update(ExecutorContext &context) const {
             auto cursor = context.cursors.top();
