@@ -9,7 +9,7 @@ namespace ufpeg {
         std::vector<std::shared_ptr<Instruction>> compile(const std::shared_ptr<Expression> &root) {
             CompilerContext context;
 
-            auto instructions = root->compile(context);
+            auto instructions = root->compile(context, {});
 
             for (auto it = instructions.begin(); it != instructions.end(); ++it) {
                 auto &reference = (*it)->get_reference();

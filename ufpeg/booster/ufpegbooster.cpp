@@ -41,6 +41,7 @@ PyObject *run(PyObject *self, PyObject *args) {
 
     std::vector<std::shared_ptr<ufpeg::Expression>> items = {
         std::make_shared<ufpeg::LiteralExpression>(U"foo"),
+        std::make_shared<ufpeg::LiteralExpression>(U"bar"),
     };
     auto choice = std::make_shared<ufpeg::ChoiceExpression>(items);
     auto repeat = std::make_shared<ufpeg::NotExpression>(choice);

@@ -14,7 +14,7 @@ namespace ufpeg {
 
         virtual std::vector<std::shared_ptr<Instruction>> compile(
             CompilerContext &context,
-            const CompileOptions &options = {}
+            const CompileOptions &options
         ) const = 0;
     };
 
@@ -25,7 +25,7 @@ namespace ufpeg {
 
         std::vector<std::shared_ptr<Instruction>> compile(
             CompilerContext &context,
-            const CompileOptions &options = {}
+            const CompileOptions &options
         ) const {
             auto commit = std::make_shared<CommitInstruction>(options.success);
             auto abort = std::make_shared<AbortInstruction>(options.failure);
@@ -37,15 +37,15 @@ namespace ufpeg {
 
             for (auto it = this->items.rbegin(); it != this->items.rend(); ++it) {
                 auto entry = std::make_shared<Reference>();
-                auto item_instructions = (*it)->compile(context, { success, failure, entry });
+                auto item_instructions = (*it)->compile(context, { entry, success, failure });
+
+                success = entry;
 
                 instructions.insert(
                     instructions.end(),
                     item_instructions.rbegin(),
                     item_instructions.rend()
                 );
-
-                success = entry;
             }
 
             instructions.emplace_back(
@@ -67,7 +67,7 @@ namespace ufpeg {
 
         std::vector<std::shared_ptr<Instruction>> compile(
             CompilerContext &context,
-            const CompileOptions &options = {}
+            const CompileOptions &options
         ) const {
             if (this->items.empty()) {
                 return {
@@ -83,15 +83,15 @@ namespace ufpeg {
             for (auto it = this->items.rbegin(); it != this->items.rend(); ++it) {
                 auto entry = std::next(it) == this->items.rend() ?
                     options.entry : std::make_shared<Reference>();
-                auto item_instructions = (*it)->compile(context, { success, failure, entry });
+                auto item_instructions = (*it)->compile(context, { entry, success, failure });
+
+                failure = entry;
 
                 instructions.insert(
                     instructions.end(),
                     item_instructions.rbegin(),
                     item_instructions.rend()
                 );
-
-                failure = entry;
             }
 
             std::reverse(instructions.begin(), instructions.end());
@@ -109,7 +109,7 @@ namespace ufpeg {
 
         std::vector<std::shared_ptr<Instruction>> compile(
             CompilerContext &context,
-            const CompileOptions &options = {}
+            const CompileOptions &options
         ) const {
             return {
                 std::make_shared<MatchLiteralInstruction>(
@@ -128,7 +128,7 @@ namespace ufpeg {
 
         std::vector<std::shared_ptr<Instruction>> compile(
             CompilerContext &context,
-            const CompileOptions &options = {}
+            const CompileOptions &options
         ) const {
             return {
                 std::make_shared<MatchRangeInstruction>(
@@ -147,10 +147,10 @@ namespace ufpeg {
 
         std::vector<std::shared_ptr<Instruction>> compile(
             CompilerContext &context,
-            const CompileOptions &options = {}
+            const CompileOptions &options
         ) const {
             return this->item->compile(context, {
-                options.success, options.success, options.entry,
+                options.entry, options.success, options.success,
             });
         }
     private:
@@ -164,9 +164,9 @@ namespace ufpeg {
 
         std::vector<std::shared_ptr<Instruction>> compile(
             CompilerContext &context,
-            const CompileOptions &options = {}
+            const CompileOptions &options
         ) const {
-            return this->item->compile(context, { options.entry, options.success, options.entry });
+            return this->item->compile(context, { options.entry, options.entry, options.success });
         }
     private:
         const std::shared_ptr<Expression> item;
@@ -179,7 +179,7 @@ namespace ufpeg {
 
         std::vector<std::shared_ptr<Instruction>> compile(
             CompilerContext &context,
-            const CompileOptions &options = {}
+            const CompileOptions &options
         ) const {
             SequenceExpression expression({
                 this->item,
@@ -199,7 +199,7 @@ namespace ufpeg {
 
         std::vector<std::shared_ptr<Instruction>> compile(
             CompilerContext &context,
-            const CompileOptions &options = {}
+            const CompileOptions &options
         ) const {
             auto entry = std::make_shared<Reference>();
 
@@ -209,9 +209,9 @@ namespace ufpeg {
 
             auto instructions = this->item->compile(
                 context, {
+                    entry,
                     abort_failure->get_reference(),
                     abort_success->get_reference(),
-                    entry,
                 }
             );
 
@@ -232,7 +232,7 @@ namespace ufpeg {
 
         std::vector<std::shared_ptr<Instruction>> compile(
             CompilerContext &context,
-            const CompileOptions &options = {}
+            const CompileOptions &options
         ) const {
             auto entry = std::make_shared<Reference>();
 
@@ -242,9 +242,9 @@ namespace ufpeg {
 
             auto instructions = this->item->compile(
                 context, {
+                    entry,
                     abort_success->get_reference(),
                     abort_failure->get_reference(),
-                    entry,
                 }
             );
 
@@ -265,7 +265,7 @@ namespace ufpeg {
 
         std::vector<std::shared_ptr<Instruction>> compile(
             CompilerContext &context,
-            const CompileOptions &options = {}
+            const CompileOptions &options
         ) const {
             std::shared_ptr<Reference> target;
 
@@ -273,7 +273,7 @@ namespace ufpeg {
                 target = context.references.at(this->name);
             } catch (const std::out_of_range&) {
                 target = std::make_shared<Reference>();
-                context.references.insert({ this->name, target });
+                context.references.emplace(this->name, target);
             }
 
             return {
@@ -296,7 +296,7 @@ namespace ufpeg {
 
         std::vector<std::shared_ptr<Instruction>> compile(
             CompilerContext &context,
-            const CompileOptions &options = {}
+            const CompileOptions &options
         ) const {
             std::shared_ptr<Reference> entry;
 
@@ -304,31 +304,30 @@ namespace ufpeg {
                 entry = context.references.at(this->name);
             } catch (const std::out_of_range&) {
                 entry = std::make_shared<Reference>();
-                context.references.insert({ this->name, entry });
+                context.references.emplace(this->name, entry);
             }
 
             auto target = std::make_shared<Reference>();
 
-            auto expect = std::make_shared<ExpectInstruction>(this->name, target);
-            auto prepare = std::make_shared<PrepareInstruction>(expect->get_reference(), entry);
+            auto prepare = std::make_shared<PrepareInstruction>(target, entry);
             auto revoke_success = std::make_shared<RevokeSuccessInstruction>();
+            auto revoke_failure = std::make_shared<RevokeFailureInstruction>();
             auto consume = std::make_shared<ConsumeInstruction>(
                 this->name, revoke_success->get_reference()
             );
-            auto revoke_failure = std::make_shared<RevokeFailureInstruction>();
             auto discard = std::make_shared<DiscardInstruction>(revoke_failure->get_reference());
 
             auto instructions = this->item->compile(
                 context, {
+                    target,
                     consume->get_reference(),
                     discard->get_reference(),
-                    target,
                 }
             );
 
-            instructions.insert(instructions.begin(), { prepare, expect });
+            instructions.emplace(instructions.begin(), prepare);
             instructions.insert(instructions.end(), {
-                consume, revoke_success, discard, revoke_failure,
+                consume, discard, revoke_success, revoke_failure,
             });
 
             return instructions;

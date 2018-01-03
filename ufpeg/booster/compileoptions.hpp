@@ -7,9 +7,9 @@
 
 namespace ufpeg {
     struct CompileOptions {
+        std::shared_ptr<Reference> entry;
         std::shared_ptr<Reference> success;
         std::shared_ptr<Reference> failure;
-        std::shared_ptr<Reference> entry;
     };
 }
 
