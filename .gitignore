@@ -1,5 +1,8 @@
-/*.egg-info
-/.vscode
 /build
 /dist
+*.dll
+*.dylib
+/*.egg-info
 __pycache__
+*.so
+/.vscode
