@@ -192,39 +192,6 @@ namespace ufpeg {
         const std::shared_ptr<Expression> item;
     };
 
-    class NotExpression: public Expression {
-    public:
-        NotExpression(const std::shared_ptr<Expression> &item):
-            item(item) {}
-
-        std::vector<std::shared_ptr<Instruction>> compile(
-            CompilerContext &context,
-            const CompileOptions &options
-        ) const {
-            auto entry = std::make_shared<Reference>();
-
-            auto begin = std::make_shared<BeginInstruction>(entry, options.entry);
-            auto abort_success = std::make_shared<AbortInstruction>(options.success);
-            auto abort_failure = std::make_shared<AbortInstruction>(options.failure);
-
-            auto instructions = this->item->compile(
-                context, {
-                    entry,
-                    abort_failure->get_reference(),
-                    abort_success->get_reference(),
-                }
-            );
-
-            instructions.emplace(instructions.begin(), begin);
-            instructions.emplace_back(abort_failure);
-            instructions.emplace_back(abort_success);
-
-            return instructions;
-        }
-    private:
-        const std::shared_ptr<Expression> item;
-    };
-
     class AndExpression: public Expression {
     public:
         AndExpression(const std::shared_ptr<Expression> &item):
@@ -251,6 +218,39 @@ namespace ufpeg {
             instructions.emplace(instructions.begin(), begin);
             instructions.emplace_back(abort_success);
             instructions.emplace_back(abort_failure);
+
+            return instructions;
+        }
+    private:
+        const std::shared_ptr<Expression> item;
+    };
+
+    class NotExpression: public Expression {
+    public:
+        NotExpression(const std::shared_ptr<Expression> &item):
+            item(item) {}
+
+        std::vector<std::shared_ptr<Instruction>> compile(
+            CompilerContext &context,
+            const CompileOptions &options
+        ) const {
+            auto entry = std::make_shared<Reference>();
+
+            auto begin = std::make_shared<BeginInstruction>(entry, options.entry);
+            auto abort_success = std::make_shared<AbortInstruction>(options.success);
+            auto abort_failure = std::make_shared<AbortInstruction>(options.failure);
+
+            auto instructions = this->item->compile(
+                context, {
+                    entry,
+                    abort_failure->get_reference(),
+                    abort_success->get_reference(),
+                }
+            );
+
+            instructions.emplace(instructions.begin(), begin);
+            instructions.emplace_back(abort_failure);
+            instructions.emplace_back(abort_success);
 
             return instructions;
         }
@@ -335,6 +335,33 @@ namespace ufpeg {
     private:
         const std::u32string name;
         const std::shared_ptr<Expression> item;
+    };
+
+    class GrammarExpression: public Expression {
+    public:
+        GrammarExpression(const std::vector<std::shared_ptr<Expression>> &items):
+            items(items) {}
+
+        std::vector<std::shared_ptr<Instruction>> compile(
+            CompilerContext &context,
+            const CompileOptions &options
+        ) const {
+            std::vector<std::shared_ptr<Instruction>> instructions;
+
+            for (auto it = this->items.begin(); it != this->items.end(); ++it) {
+                auto item_instructions = (*it)->compile(context, {});
+
+                instructions.insert(
+                    instructions.end(),
+                    item_instructions.begin(),
+                    item_instructions.end()
+                );
+            }
+
+            return instructions;
+        }
+    private:
+        const std::vector<std::shared_ptr<Expression>> items;
     };
 }
 

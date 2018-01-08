@@ -6,6 +6,16 @@
 #include "reference.hpp"
 #include "executorcontext.hpp"
 
+#include <iostream>
+#include <iomanip>
+#include <locale>
+#include <codecvt>
+
+std::string u32tou8(const std::u32string &text) {
+    std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> cvt;
+    return cvt.to_bytes(text);
+}
+
 namespace ufpeg {
     class Instruction {
     public:
@@ -15,6 +25,8 @@ namespace ufpeg {
         virtual ~Instruction() = default;
 
         virtual void update(ExecutorContext &context) const = 0;
+
+        virtual void print() const = 0;
 
         const std::shared_ptr<Reference> &get_reference() const {
             return this->reference;
@@ -41,6 +53,10 @@ namespace ufpeg {
                 this->failure->get_offset(),
             });
         }
+
+        void print() const {
+            std::cout << "INVOKE " << this->target->get_offset() << " " << this->success->get_offset() << " " << this->failure->get_offset() << std::endl;
+        }
     private:
         const std::shared_ptr<Reference> target, success, failure;
     };
@@ -52,6 +68,10 @@ namespace ufpeg {
 
             context.frames.pop();
         }
+
+        void print() const {
+            std::cout << "REVOKE_SUCCESS" << std::endl;
+        }
     };
 
     class RevokeFailureInstruction: public Instruction {
@@ -60,6 +80,10 @@ namespace ufpeg {
             context.pointer = context.frames.top().failure;
 
             context.frames.pop();
+        }
+
+        void print() const {
+            std::cout << "REVOKE_FAILURE" << std::endl;
         }
     };
 
@@ -72,9 +96,13 @@ namespace ufpeg {
             Instruction(reference), target(target) {}
 
         void update(ExecutorContext &context) const {
-            context.nodes.push({ nullptr, context.cursors.top() });
+            context.nodes.push({ {}, context.cursors.top() });
 
             context.pointer = this->target->get_offset();
+        }
+
+        void print() const {
+            std::cout << "PREPARE " << this->target->get_offset() << std::endl;
         }
     private:
         const std::shared_ptr<Reference> target;
@@ -92,12 +120,16 @@ namespace ufpeg {
         void update(ExecutorContext &context) const {
             auto child = std::move(context.nodes.top());
             context.nodes.pop();
-            child.name = this->name.c_str();
+            child.name = this->name;
             child.stop = context.cursors.top();
             auto &parent = context.nodes.top();
             parent.children.emplace_back(child);
 
             context.pointer = this->target->get_offset();
+        }
+
+        void print() const {
+            std::cout << "CONSUME \"" << u32tou8(this->name) << "\" " << this->target->get_offset() << std::endl;
         }
     private:
         const std::u32string name;
@@ -117,6 +149,10 @@ namespace ufpeg {
 
             context.pointer = this->target->get_offset();
         }
+
+        void print() const {
+            std::cout << "DISCARD " << this->target->get_offset() << std::endl;
+        }
     private:
         const std::shared_ptr<Reference> target;
     };
@@ -134,6 +170,10 @@ namespace ufpeg {
             context.cursors.push(cursor);
 
             context.pointer = this->target->get_offset();
+        }
+
+        void print() const {
+            std::cout << "BEGIN " << this->target->get_offset() << std::endl;
         }
     private:
         const std::shared_ptr<Reference> target;
@@ -154,6 +194,10 @@ namespace ufpeg {
 
             context.pointer = this->target->get_offset();
         }
+
+        void print() const {
+            std::cout << "COMMIT " << this->target->get_offset() << std::endl;
+        }
     private:
         const std::shared_ptr<Reference> target;
     };
@@ -170,6 +214,10 @@ namespace ufpeg {
             context.cursors.pop();
 
             context.pointer = this->target->get_offset();
+        }
+
+        void print() const {
+            std::cout << "ABORT " << this->target->get_offset() << std::endl;
         }
     private:
         const std::shared_ptr<Reference> target;
@@ -195,6 +243,10 @@ namespace ufpeg {
                 cursor += length;
                 context.pointer = this->success->get_offset();
             }
+        }
+
+        void print() const {
+            std::cout << "MATCH_LITERAL \"" << u32tou8(this->literal) << "\" " << this->success->get_offset() << " " << this->failure->get_offset() << std::endl;
         }
     private:
         const std::u32string literal;
@@ -222,6 +274,10 @@ namespace ufpeg {
                 context.pointer = this->failure->get_offset();
             }
         }
+
+        void print() const {
+            std::cout << "MATCH_RANGE " << this->min << " " << this->max << " " << this->success->get_offset() << " " << this->failure->get_offset() << std::endl;
+        }
     private:
         const char32_t min, max;
         const std::shared_ptr<Reference> success, failure;
@@ -237,6 +293,10 @@ namespace ufpeg {
 
         void update(ExecutorContext &context) const {
             context.pointer = this->target->get_offset();
+        }
+
+        void print() const {
+            std::cout << "JUMP " << this->target->get_offset() << std::endl;
         }
     private:
         const std::shared_ptr<Reference> target;
@@ -257,9 +317,13 @@ namespace ufpeg {
                 context.expectations.clear();
                 context.offset = cursor;
             }
-            context.expectations.push_back(this->name.c_str());
+            context.expectations.push_back(this->name);
 
             context.pointer = this->target->get_offset();
+        }
+
+        void print() const {
+            std::cout << "EXPECT \"" << u32tou8(this->name) << "\" " << this->target->get_offset() << std::endl;
         }
     private:
         const std::u32string name;

@@ -1,8 +1,18 @@
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
 
+#include "bootstrap.hpp"
 #include "compiler.hpp"
-//#include "virtualmachine.hpp"
+#include "executor.hpp"
+#include "nodevisitor.hpp"
+
+void dump(const std::u32string &text, const ufpeg::Node &node, std::size_t level = 0) {
+    std::cout << std::string(level, '\t') << u32tou8(node.name) << " " << node.start << ":" << node.stop << " " << u32tou8(text.substr(node.start, node.stop - node.start)) << std::endl;
+
+    for (const auto &child: node.children) {
+        dump(text, child, level + 1);
+    }
+}
 
 std::u32string to_u32string(PyObject *pytext) {
     if (!PyUnicode_Check(pytext)) {
@@ -39,17 +49,27 @@ PyObject *run(PyObject *self, PyObject *args) {
         return nullptr;
     }
 
-    std::vector<std::shared_ptr<ufpeg::Expression>> items = {
-        std::make_shared<ufpeg::LiteralExpression>(U"foo"),
-        std::make_shared<ufpeg::LiteralExpression>(U"bar"),
-    };
-    auto choice = std::make_shared<ufpeg::ChoiceExpression>(items);
-    auto repeat = std::make_shared<ufpeg::NotExpression>(choice);
-    auto rule = std::make_shared<ufpeg::RuleDefinitionExpression>(U"foobar", repeat);
+    auto rule = ufpeg::bootstrap();
+
     ufpeg::Compiler compiler;
     auto instructions = compiler.compile(rule);
-    // ufpeg::VirtualMachine virtual_machine;
-    // virtual_machine.execute(instructions, grammar);
+    for (auto instruction: instructions) {
+        std::cout << "L" << instruction->get_reference()->get_offset() << ": ";
+        instruction->print();
+    }
+
+    // ufpeg::Executor executor(instructions);
+    // auto node = executor.execute(grammar);
+
+    // dump(grammar, node);
+
+    // ufpeg::NodeVisitor<std::shared_ptr<ufpeg::Expression>> expression_visitor;
+
+    // expression_visitor.add_handler(U"foo", [&]() {
+    //     return repeat;
+    // });
+
+    // expression_visitor.visit(node);
 
     Py_RETURN_NONE;
 }
