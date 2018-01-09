@@ -192,6 +192,27 @@ namespace ufpeg {
         const std::shared_ptr<Expression> item;
     };
 
+    class RepeatExpression: public Expression {
+    public:
+        RepeatExpression(const std::shared_ptr<Expression> &item, std::size_t count):
+            item(item), count(count) {}
+
+        std::vector<std::shared_ptr<Instruction>> compile(
+            CompilerContext &context,
+            const CompileOptions &options
+        ) const {
+            SequenceExpression expression({
+                this->count,
+                this->item,
+            });
+
+            return expression.compile(context, options);
+        }
+    private:
+        const std::shared_ptr<Expression> item;
+        const std::size_t count;
+    };
+
     class AndExpression: public Expression {
     public:
         AndExpression(const std::shared_ptr<Expression> &item):
