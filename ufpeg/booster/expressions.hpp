@@ -224,21 +224,21 @@ namespace ufpeg {
         ) const {
             auto entry = std::make_shared<Reference>();
 
-            auto begin = std::make_shared<BeginInstruction>(entry, options.entry);
-            auto abort_success = std::make_shared<AbortInstruction>(options.success);
-            auto abort_failure = std::make_shared<AbortInstruction>(options.failure);
+            auto prepare = std::make_shared<PrepareInstruction>(entry, options.entry);
+            auto discard_success = std::make_shared<DiscardInstruction>(options.success);
+            auto discard_failure = std::make_shared<DiscardInstruction>(options.failure);
 
             auto instructions = this->item->compile(
                 context, {
                     entry,
-                    abort_success->get_reference(),
-                    abort_failure->get_reference(),
+                    discard_success->get_reference(),
+                    discard_failure->get_reference(),
                 }
             );
 
-            instructions.emplace(instructions.begin(), begin);
-            instructions.emplace_back(abort_success);
-            instructions.emplace_back(abort_failure);
+            instructions.emplace(instructions.begin(), prepare);
+            instructions.emplace_back(discard_success);
+            instructions.emplace_back(discard_failure);
 
             return instructions;
         }
@@ -257,21 +257,21 @@ namespace ufpeg {
         ) const {
             auto entry = std::make_shared<Reference>();
 
-            auto begin = std::make_shared<BeginInstruction>(entry, options.entry);
-            auto abort_success = std::make_shared<AbortInstruction>(options.success);
-            auto abort_failure = std::make_shared<AbortInstruction>(options.failure);
+            auto prepare = std::make_shared<PrepareInstruction>(entry, options.entry);
+            auto discard_success = std::make_shared<DiscardInstruction>(options.success);
+            auto discard_failure = std::make_shared<DiscardInstruction>(options.failure);
 
             auto instructions = this->item->compile(
                 context, {
                     entry,
-                    abort_failure->get_reference(),
-                    abort_success->get_reference(),
+                    discard_failure->get_reference(),
+                    discard_success->get_reference(),
                 }
             );
 
-            instructions.emplace(instructions.begin(), begin);
-            instructions.emplace_back(abort_failure);
-            instructions.emplace_back(abort_success);
+            instructions.emplace(instructions.begin(), prepare);
+            instructions.emplace_back(discard_failure);
+            instructions.emplace_back(discard_success);
 
             return instructions;
         }

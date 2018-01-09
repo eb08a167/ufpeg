@@ -237,12 +237,16 @@ namespace ufpeg {
             auto &cursor = context.cursors.top();
             const auto length = this->literal.length();
 
-            if (context.text.compare(cursor, length, this->literal)) {
-                context.pointer = this->failure->get_offset();
-            } else {
-                cursor += length;
-                context.pointer = this->success->get_offset();
+            try {
+                if (!context.text.compare(cursor, length, this->literal)) {
+                    cursor += length;
+                    context.pointer = this->success->get_offset();
+                    return;
+                }
+            } catch (const std::out_of_range&) {
             }
+
+            context.pointer = this->failure->get_offset();
         }
 
         void print() const {
@@ -265,14 +269,19 @@ namespace ufpeg {
 
         void update(ExecutorContext &context) const {
             auto &cursor = context.cursors.top();
-            const auto code = context.text.at(cursor);
 
-            if (this->min <= code && code <= this->max) {
-                cursor++;
-                context.pointer = this->success->get_offset();
-            } else {
-                context.pointer = this->failure->get_offset();
+            try {
+                const auto code = context.text.at(cursor);
+
+                if (this->min <= code && code <= this->max) {
+                    cursor++;
+                    context.pointer = this->success->get_offset();
+                    return;
+                }
+            } catch (const std::out_of_range&) {
             }
+
+            context.pointer = this->failure->get_offset();
         }
 
         void print() const {

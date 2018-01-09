@@ -58,10 +58,10 @@ PyObject *run(PyObject *self, PyObject *args) {
         instruction->print();
     }
 
-    // ufpeg::Executor executor(instructions);
-    // auto node = executor.execute(grammar);
+    ufpeg::Executor executor(instructions);
+    auto node = executor.execute(grammar);
 
-    // dump(grammar, node);
+    dump(grammar, node);
 
     // ufpeg::NodeVisitor<std::shared_ptr<ufpeg::Expression>> expression_visitor;
 
