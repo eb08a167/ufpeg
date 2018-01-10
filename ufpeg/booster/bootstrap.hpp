@@ -64,7 +64,8 @@ space
     = white-space*;
 
 character-literal
-    = single-quote single-quoted-character single-quote;
+    = single-quote single-quoted-character single-quote
+    | double-quote double-quoted-character double-quote;
 
 string-literal
     = single-quote single-quoted-characters single-quote
@@ -95,18 +96,18 @@ escape-sequence
     | hexadecimal-escape-sequence;
 
 builtin-escape-sequence
-    = "\\"
-    | "\""
+    = '\\'
+    | '"'
     | "'"
-    | "0"
-    | "a"
-    | "b"
-    | "t"
-    | "n"
-    | "v"
-    | "f"
-    | "r"
-    | "e";
+    | '0'
+    | 'a'
+    | 'b'
+    | 't'
+    | 'n'
+    | 'v'
+    | 'f'
+    | 'r'
+    | 'e';
 
 binary-escape-sequence
     = "b" binary-digits;
@@ -157,29 +158,26 @@ escape
 white-space
     = '\t'..'\r'
     | ' '
-    | '\h85'
-    | '\hA0'
-    | '\h1680'
-    | '\h2000'..'\h200A'
-    | '\h2028'..'\h2029'
-    | '\h202F'
-    | '\h205F'
-    | '\h3000';
+    | '\h{85}'
+    | '\h{A0}'
+    | '\h{1680}'
+    | '\h{2000}'..'\h{200A}'
+    | '\h{2028}'..'\h{2029}'
+    | '\h{202F}'
+    | '\h{205F}'
+    | '\h{3000}';
 
 character
-    = '\0'..'\h10FFFF';
+    = '\0'..'\h{10FFFF}';
 */
 
 namespace ufpeg {
-    std::shared_ptr<Expression> bootstrap() {
+    auto bootstrap() {
         using namespace std;
 
-        auto string_literal = []() {
-            auto pairs = {
-                make_pair(U"single-quote", U"single-quoted-characters"),
-                make_pair(U"double-quote", U"double-quoted-characters"),
-            };
-
+        auto text_literal = [](
+                auto name, const vector<pair<const char32_t*, const char32_t*>> &pairs
+            ) {
             vector<shared_ptr<Expression>> choices;
 
             for (const auto &pair: pairs) {
@@ -195,8 +193,23 @@ namespace ufpeg {
             }
 
             return make_shared<RuleDefinitionExpression>(
-                U"string-literal",
+                name,
                 make_shared<ChoiceExpression>(choices)
+            );
+        };
+
+        auto range_literal = []() {
+            auto character_literal = make_shared<RuleReferenceExpression>(U"character-literal");
+
+            vector<shared_ptr<Expression>> items = {
+                character_literal,
+                make_shared<LiteralExpression>(U".."),
+                character_literal,
+            };
+
+            return make_shared<RuleDefinitionExpression>(
+                U"range-literal",
+                make_shared<SequenceExpression>(items)
             );
         };
 
@@ -210,14 +223,14 @@ namespace ufpeg {
         };
 
         auto quoted_character = [](auto name, auto quote_name) {
-            vector<shared_ptr<Expression>> not_items = {
+            vector<shared_ptr<Expression>> not_choices = {
                 make_shared<RuleReferenceExpression>(quote_name),
                 make_shared<RuleReferenceExpression>(U"escape"),
             };
 
             vector<shared_ptr<Expression>> items = {
                 make_shared<NotExpression>(
-                    make_shared<ChoiceExpression>(not_items)
+                    make_shared<ChoiceExpression>(not_choices)
                 ),
                 make_shared<RuleReferenceExpression>(U"character"),
             };
@@ -311,7 +324,7 @@ namespace ufpeg {
             );
         };
 
-        auto digit = [](auto name, initializer_list<pair<char32_t, char32_t>> ranges) {
+        auto digit = [](auto name, const vector<pair<char32_t, char32_t>> &ranges) {
             vector<shared_ptr<Expression>> items;
 
             for (const auto &range: ranges) {
@@ -375,7 +388,15 @@ namespace ufpeg {
         };
 
         vector<shared_ptr<Expression>> items = {
-            string_literal(),
+            range_literal(),
+            text_literal(U"character-literal", {
+                { U"single-quote", U"single-quoted-character" },
+                { U"double-quote", U"double-quoted-character" },
+            }),
+            text_literal(U"string-literal", {
+                { U"single-quote", U"single-quoted-characters" },
+                { U"double-quote", U"double-quoted-characters" },
+            }),
             quoted_characters(U"single-quoted-characters", U"single-quoted-character"),
             quoted_characters(U"double-quoted-characters", U"double-quoted-character"),
             quoted_character(U"single-quoted-character", U"single-quote"),
